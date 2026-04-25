@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.0</title>
+<meta property="og:title" content="ESG 자가진단 컨설팅 플랫폼">
+<meta property="og:description" content="중소기업 ESG 자가진단 + AI 맞춤형 컨설팅 보고서">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root{
+  /* ─── 어드민 v9.0과 동일 디자인 시스템 ─── */
+  --navy:#002555;--navy-d:#001A3D;--navy-l:#E8EDF5;--navy-ll:#F4F7FB;
+  --accent:#3F8CAA;--accent-l:#EBF4F8;
+  --white:#fff;--off:#F5F7FA;
+  --g1:#1A2340;--g2:#4A5270;--g3:#8890A8;
+  --border:#DDE2EE;
+  --auto:#00A050;--auto-l:#E6F9EF;
+  --cond:#E07B00;--cond-l:#FFF4E5;
+  --hitl:#C0392B;--hitl-l:#FDECEB;
+  /* ─── ESG 영역별 색상 ─── */
+  --env:#15803d;--env-l:#DCFCE7;
+  --soc:#2563EB;--soc-l:#DBEAFE;
+  --gov:#7c3aed;--gov-l:#EDE9FE;
+  /* ─── 기타 ─── */
+  --font:"Noto Sans KR",sans-serif;
+  --mono:"JetBrains Mono",monospace;
+  --sidebar:230px;
+  --shadow-sm:0 1px 2px rgba(0,21,55,.06);
+  --shadow-md:0 4px 12px rgba(0,21,55,.08);
+  --shadow-lg:0 12px 32px rgba(0,21,55,.12);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1.6;min-height:100vh;-webkit-tap-highlight-color:transparent;}
+
+/* ─── 공통 레이아웃 ─── */
+.page{max-width:1200px;margin:0 auto;padding:24px;}
+.page-narrow{max-width:760px;margin:0 auto;padding:24px;}
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50;box-shadow:var(--shadow-sm);}
+.brand{display:flex;align-items:center;gap:10px;flex:1;}
+.brand-mark{font-size:10px;font-weight:700;letter-spacing:2.5px;color:var(--accent);text-transform:uppercase;}
+.brand-title{font-size:14px;font-weight:900;color:var(--navy);}
+.brand-version{font-size:10px;color:var(--g3);font-family:var(--mono);}
+.btn-icon{background:none;border:none;color:var(--g3);cursor:pointer;font-size:14px;padding:6px;border-radius:4px;}
+.btn-icon:hover{background:var(--off);color:var(--navy);}
+
+/* ─── 버튼 ─── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 22px;border-radius:6px;font-size:14px;font-weight:600;border:1px solid var(--border);cursor:pointer;font-family:var(--font);background:var(--white);color:var(--g2);transition:all .15s;text-decoration:none;}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff;}
+.btn.primary:hover:not(:disabled){background:var(--navy-d);border-color:var(--navy-d);color:#fff;}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn.accent:hover:not(:disabled){background:#357A95;border-color:#357A95;color:#fff;}
+.btn.lg{padding:14px 32px;font-size:15px;}
+.btn.full{width:100%;}
+.btn.sm{padding:6px 14px;font-size:12px;}
+
+/* ─── 카드 ─── */
+.card{background:var(--white);border-radius:10px;border:1px solid var(--border);padding:24px;box-shadow:var(--shadow-sm);margin-bottom:18px;}
+.card-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+.card-sub{font-size:12px;color:var(--g3);margin-bottom:16px;}
+
+/* ─── Step Indicator ─── */
+.step-bar{display:flex;align-items:center;gap:8px;margin-bottom:24px;padding:0 4px;}
+.step-dot{flex:1;height:5px;border-radius:3px;background:var(--border);transition:background .3s;}
+.step-dot.done{background:var(--auto);}
+.step-dot.active{background:var(--navy);}
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/*  STEP 1: LANDING (사용자 유형 선택)                                      */
+/* ═══════════════════════════════════════════════════════════════════════ */
+.landing-hero{text-align:center;padding:48px 24px 32px;}
+.landing-mark{display:inline-block;font-size:10px;font-weight:700;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:12px;padding:4px 14px;background:var(--accent-l);border-radius:12px;}
+.landing-title{font-size:32px;font-weight:900;color:var(--navy);margin-bottom:10px;letter-spacing:-.5px;line-height:1.25;}
+.landing-sub{font-size:14px;color:var(--g2);max-width:520px;margin:0 auto;line-height:1.65;}
+.user-type-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:32px;}
+.user-type-card{background:var(--white);border:2px solid var(--border);border-radius:12px;padding:28px 22px;cursor:pointer;transition:all .2s;text-align:left;font-family:var(--font);}
+.user-type-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--shadow-md);}
+.user-type-card.selected{border-color:var(--navy);background:var(--navy-ll);box-shadow:var(--shadow-md);}
+.utc-icon{font-size:32px;margin-bottom:12px;}
+.utc-title{font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px;}
+.utc-tag{display:inline-block;font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-l);padding:2px 8px;border-radius:8px;margin-bottom:10px;letter-spacing:.5px;}
+.utc-desc{font-size:12px;color:var(--g2);line-height:1.6;margin-bottom:8px;}
+.utc-features{font-size:11px;color:var(--g3);}
+.utc-features li{margin-bottom:3px;list-style:none;padding-left:14px;position:relative;}
+.utc-features li::before{content:"·";position:absolute;left:4px;color:var(--accent);font-weight:700;}
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/*  STEP 2: COMPANY INFO                                                   */
+/* ═══════════════════════════════════════════════════════════════════════ */
+.form-row{margin-bottom:18px;}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--g2);margin-bottom:6px;letter-spacing:.3px;}
+.form-label .req{color:var(--hitl);margin-left:2px;}
+.input,.select{width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:var(--font);color:var(--g1);outline:none;background:var(--white);transition:border-color .15s;}
+.input:focus,.select:focus{border-color:var(--accent);}
+.input.error{border-color:var(--hitl);}
+.input-help{font-size:11px;color:var(--g3);margin-top:4px;}
+.input-error{font-size:11px;color:var(--hitl);margin-top:4px;font-weight:600;}
+.input-row{display:flex;gap:8px;}
+.input-row .input{flex:1;}
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/*  STEP 3: 30 QUESTIONS                                                   */
+/* ═══════════════════════════════════════════════════════════════════════ */
+.q-progress{position:sticky;top:62px;z-index:40;background:var(--white);padding:14px 24px;border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm);}
+.q-progress-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.q-progress-fill{height:100%;background:var(--accent);transition:width .3s;}
+.q-progress-info{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;}
+.q-progress-info .pct{font-family:var(--mono);font-weight:700;color:var(--navy);}
+.q-area-tabs{display:flex;gap:4px;margin-bottom:18px;}
+.q-tab{flex:1;padding:10px;border-radius:6px;border:1px solid var(--border);background:var(--white);font-size:12px;font-weight:700;color:var(--g3);cursor:pointer;font-family:var(--font);transition:all .15s;}
+.q-tab.active{border-width:2px;}
+.q-tab.E.active{border-color:var(--env);color:var(--env);background:var(--env-l);}
+.q-tab.S.active{border-color:var(--soc);color:var(--soc);background:var(--soc-l);}
+.q-tab.G.active{border-color:var(--gov);color:var(--gov);background:var(--gov-l);}
+.q-tab .count{display:inline-block;margin-left:4px;font-family:var(--mono);font-size:10px;}
+
+.q-card{background:var(--white);border-radius:10px;border:1px solid var(--border);padding:18px 18px 14px;margin-bottom:14px;box-shadow:var(--shadow-sm);}
+.q-card-head{display:flex;gap:10px;margin-bottom:10px;}
+.q-code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent);padding:3px 8px;background:var(--accent-l);border-radius:4px;flex-shrink:0;height:24px;display:inline-flex;align-items:center;}
+.q-text{font-size:14px;font-weight:600;color:var(--g1);line-height:1.5;flex:1;}
+.q-help{font-size:11px;color:var(--g3);margin:6px 0 12px;line-height:1.55;padding:8px 10px;background:var(--off);border-radius:5px;border-left:3px solid var(--border);}
+.q-help b{color:var(--g2);}
+.q-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px;}
+.q-scale-btn{padding:11px 4px;border:1.5px solid var(--border);border-radius:6px;background:var(--white);cursor:pointer;font-family:var(--font);transition:all .12s;}
+.q-scale-btn:hover{border-color:var(--accent);}
+.q-scale-btn.selected{border-color:var(--navy);background:var(--navy);color:#fff;}
+.q-scale-btn .num{font-size:18px;font-weight:800;display:block;}
+.q-scale-btn .lbl{font-size:9.5px;display:block;margin-top:2px;color:var(--g3);font-weight:600;letter-spacing:-.3px;}
+.q-scale-btn.selected .lbl{color:#fff;opacity:.85;}
+.q-evidence{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--g3);margin-top:6px;}
+.q-evidence input[type="file"]{display:none;}
+.q-evidence-btn{padding:5px 12px;border:1px dashed var(--border);border-radius:5px;background:transparent;color:var(--g3);font-size:11px;cursor:pointer;font-family:var(--font);}
+.q-evidence-btn:hover{border-color:var(--accent);color:var(--accent);}
+.q-evidence-btn.uploaded{border-style:solid;border-color:var(--auto);color:var(--auto);background:var(--auto-l);}
+
+.q-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px;padding:18px 0;border-top:1px solid var(--border);}
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/*  STEP 4: ANALYSIS (로딩)                                                 */
+/* ═══════════════════════════════════════════════════════════════════════ */
+.analyzing{text-align:center;padding:64px 24px;}
+.spinner{width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;margin:0 auto 24px;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.analyzing-title{font-size:20px;font-weight:800;color:var(--navy);margin-bottom:8px;}
+.analyzing-sub{font-size:13px;color:var(--g2);margin-bottom:24px;}
+.analyzing-stages{max-width:380px;margin:0 auto;text-align:left;}
+.analyzing-stage{display:flex;align-items:center;gap:10px;padding:8px 12px;font-size:13px;color:var(--g3);border-radius:6px;}
+.analyzing-stage.active{color:var(--navy);background:var(--accent-l);font-weight:600;}
+.analyzing-stage.done{color:var(--auto);}
+.analyzing-stage .dot{width:8px;height:8px;border-radius:50%;background:var(--border);}
+.analyzing-stage.active .dot{background:var(--accent);animation:pulse 1.2s ease-in-out infinite;}
+.analyzing-stage.done .dot{background:var(--auto);}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.4);opacity:.5;}}
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+/*  STEP 5: RESULT                                                         */
+/* ═══════════════════════════════════════════════════════════════════════ */
+.result-summary{background:linear-gradient(135deg,var(--navy),var(--navy-d));border-radius:14px;padding:32px;color:#fff;margin-bottom:18px;}
+.result-summary-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:18px;margin-bottom:24px;}
+.result-company{font-size:20px;font-weight:800;}
+.result-meta{font-size:12px;color:rgba(255,255,255,.7);margin-top:4px;}
+.result-grade-block{text-align:right;}
+.result-grade{font-size:42px;font-weight:900;font-family:var(--mono);line-height:1;}
+.result-grade-label{font-size:13px;color:rgba(255,255,255,.85);margin-top:4px;font-weight:600;}
+.result-score-line{display:flex;gap:18px;flex-wrap:wrap;}
+.result-score-item{flex:1;min-width:120px;padding:14px 16px;background:rgba(255,255,255,.08);border-radius:8px;}
+.result-score-label{font-size:11px;color:rgba(255,255,255,.7);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;}
+.result-score-value{font-size:22px;font-weight:800;font-family:var(--mono);}
+.result-score-value .max{font-size:13px;font-weight:500;color:rgba(255,255,255,.5);margin-left:2px;}
+
+/* 영역별 카드 */
+.area-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;}
+@media(max-width:768px){.area-grid{grid-template-columns:1fr;}}
+.area-card{background:var(--white);border-radius:10px;border:1px solid var(--border);padding:20px;}
+.area-card.E{border-top:3px solid var(--env);}
+.area-card.S{border-top:3px solid var(--soc);}
+.area-card.G{border-top:3px solid var(--gov);}
+.area-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.area-card-title{display:flex;align-items:center;gap:8px;}
+.area-card-icon{font-size:22px;}
+.area-card-name{font-size:14px;font-weight:800;color:var(--navy);}
+.area-card-eng{font-size:10px;color:var(--g3);}
+.area-card-score{font-size:24px;font-weight:900;font-family:var(--mono);color:var(--navy);}
+.area-card-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:12px;}
+.area-card-bar-fill{height:100%;border-radius:3px;}
+.area-card-bar-fill.E{background:var(--env);}
+.area-card-bar-fill.S{background:var(--soc);}
+.area-card-bar-fill.G{background:var(--gov);}
+.area-card-stats{display:flex;justify-content:space-between;font-size:11px;color:var(--g3);}
+.area-card-stats b{color:var(--g1);font-weight:700;}
+
+/* 탭 */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:18px;overflow-x:auto;}
+.tab{padding:11px 18px;border:none;background:none;font-size:13px;font-weight:700;color:var(--g3);cursor:pointer;font-family:var(--font);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+.tab:hover{color:var(--accent);}
+.tab.active{color:var(--navy);border-bottom-color:var(--navy);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* 보고서 영역 (PDF로 변환할 부분) */
+.report{background:var(--white);border-radius:10px;border:1px solid var(--border);padding:0;overflow:hidden;margin-bottom:18px;}
+.report-head{padding:20px 24px;background:linear-gradient(135deg,var(--navy-ll),var(--white));border-bottom:1px solid var(--border);}
+.report-title{font-size:18px;font-weight:800;color:var(--navy);margin-bottom:4px;}
+.report-meta{font-size:11px;color:var(--g3);font-family:var(--mono);}
+.report-body{padding:24px;}
+.report-section{margin-bottom:28px;}
+.report-section:last-child{margin-bottom:0;}
+.report-section-num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent);letter-spacing:1px;}
+.report-section-title{font-size:16px;font-weight:800;color:var(--navy);margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid var(--accent);}
+.report-section-title.E{border-color:var(--env);}
+.report-section-title.S{border-color:var(--soc);}
+.report-section-title.G{border-color:var(--gov);}
+.report-p{font-size:13px;color:var(--g1);line-height:1.75;margin-bottom:10px;}
+.report-p b{color:var(--navy);font-weight:700;}
+.report-list{margin:8px 0 12px 0;}
+.report-list li{font-size:13px;color:var(--g1);line-height:1.7;margin-bottom:5px;list-style:none;padding-left:18px;position:relative;}
+.report-list li::before{content:"▸";position:absolute;left:4px;color:var(--accent);font-weight:700;}
+.report-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px;}
+.report-table th{background:var(--navy-ll);padding:8px 12px;text-align:left;font-size:11px;color:var(--g2);font-weight:700;border-bottom:1px solid var(--border);}
+.report-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--g1);}
+.report-table tr:last-child td{border-bottom:none;}
+.report-callout{background:var(--accent-l);border-left:3px solid var(--accent);padding:12px 16px;border-radius:5px;margin:12px 0;font-size:12px;color:var(--g1);line-height:1.65;}
+.report-callout b{color:var(--navy);}
+.report-footer{padding:14px 24px;background:var(--off);border-top:1px solid var(--border);font-size:10px;color:var(--g3);text-align:center;}
+
+/* 다운로드 영역 */
+.download-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;}
+@media(max-width:768px){.download-grid{grid-template-columns:1fr;}}
+.dl-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:8px;}
+.dl-card-icon{font-size:24px;}
+.dl-card-title{font-size:13px;font-weight:700;color:var(--navy);}
+.dl-card-desc{font-size:11px;color:var(--g3);line-height:1.5;flex:1;}
+.dl-card-status{font-size:10px;font-family:var(--mono);font-weight:700;padding:3px 8px;border-radius:4px;display:inline-block;}
+.dl-card-status.ready{background:var(--auto-l);color:var(--auto);}
+.dl-card-status.processing{background:var(--cond-l);color:var(--cond);}
+.dl-card-status.failed{background:var(--hitl-l);color:var(--hitl);}
+
+/* AI 생성물 안내 박스 */
+.ai-warning{background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:14px 18px;margin-bottom:18px;font-size:12px;color:#5D4037;line-height:1.65;}
+.ai-warning b{color:#E65100;}
+.ai-warning.consultant{background:var(--hitl-l);border-color:var(--hitl);color:#5D2620;}
+.ai-warning.consultant b{color:var(--hitl);}
+
+/* 라벨 */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.3px;}
+.badge.A{background:#DCFCE7;color:#15803D;}
+.badge.B{background:var(--accent-l);color:var(--accent);}
+.badge.C{background:var(--cond-l);color:var(--cond);}
+.badge.D{background:var(--hitl-l);color:var(--hitl);}
+.badge.user-type{background:var(--navy-ll);color:var(--navy);font-size:10px;padding:2px 8px;}
+
+/* 모달 */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,21,55,.6);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px;}
+.modal-backdrop.show{display:flex;}
+.modal{background:var(--white);border-radius:12px;max-width:520px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.3);}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.modal-title{font-size:14px;font-weight:700;color:var(--navy);}
+.modal-body{padding:22px;overflow-y:auto;font-size:13px;color:var(--g1);line-height:1.7;}
+.modal-actions{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+
+/* 토스트 */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);z-index:99999;opacity:0;pointer-events:none;transition:opacity .25s;}
+.toast.show{opacity:1;}
+
+/* 모바일 */
+@media(max-width:640px){
+  .page,.page-narrow{padding:14px;}
+  .topbar{padding:12px 14px;}
+  .landing-title{font-size:24px;}
+  .landing-sub{font-size:13px;}
+  .user-type-grid{grid-template-columns:1fr;}
+  .result-summary{padding:22px;}
+  .result-grade{font-size:34px;}
+  .q-scale-btn .num{font-size:16px;}
+  .q-scale-btn .lbl{font-size:8.5px;}
+  .download-grid{grid-template-columns:1fr;}
+}
+
+/* PDF 변환 시 사용할 숨김 영역 */
+.pdf-render-area{position:absolute;left:-9999px;top:0;width:794px;background:#fff;}
+</style>
+</head>
+<body>
+
+<!-- ─── TOPBAR ─── -->
+<div class="topbar" id="topbar">
+  <div class="brand">
+    <div>
+      <div class="brand-mark">ESG-AACS</div>
+      <div class="brand-title">자가진단 컨설팅 플랫폼</div>
+    </div>
+    <span class="brand-version">v8.0</span>
+  </div>
+  <button class="btn-icon" id="resetBtn" onclick="confirmReset()" title="처음부터" style="display:none;">↺</button>
+</div>
+
+<!-- ─── 진단 진행 시 진행률 표시 ─── -->
+<div class="q-progress" id="qProgress" style="display:none;">
+  <div class="q-progress-bar"><div class="q-progress-fill" id="qProgressFill" style="width:0%"></div></div>
+  <div class="q-progress-info">
+    <span id="qProgressText">0 / 30 문항 응답</span>
+    <span class="pct" id="qProgressPct">0%</span>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════ -->
+<!-- STEP 1: LANDING (사용자 유형 선택) -->
+<!-- ═════════════════════════════════════════════════════════════ -->
+<div class="page-narrow" id="step-landing">
+  <div class="landing-hero">
+    <div class="landing-mark">ESG Bridge for SMEs</div>
+    <div class="landing-title">중소기업 ESG<br>자가진단·컨설팅 플랫폼</div>
+    <div class="landing-sub">
+      30문항 자가진단으로 ESG 등급을 예측하고,<br>
+      Agentic AI가 작성하는 맞춤형 컨설팅 보고서를 즉시 받아보세요.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">시작 전, 사용자 유형을 선택해 주세요</div>
+    <div class="card-sub">유형에 따라 제공되는 자료의 범위와 안내가 달라집니다.</div>
+
+    <div class="user-type-grid">
+      <button class="user-type-card" id="utc-company" onclick="selectUserType('company')">
+        <div class="utc-icon">🏢</div>
+        <div class="utc-tag">CASE 1</div>
+        <div class="utc-title">평가대상 기업</div>
+        <div class="utc-desc">자사 ESG 현황을 진단하고 개선 방향을 알아보고 싶은 중소기업 담당자</div>
+        <ul class="utc-features">
+          <li>자가진단 보고서 제공</li>
+          <li>AI 컨설팅 보고서 제공</li>
+          <li>증빙자료 프리뷰 (참고용)</li>
+        </ul>
+      </button>
+      <button class="user-type-card" id="utc-consultant" onclick="selectUserType('consultant')">
+        <div class="utc-icon">👔</div>
+        <div class="utc-tag">CASE 2</div>
+        <div class="utc-title">컨설턴트</div>
+        <div class="utc-desc">고객사 ESG 컨설팅에 활용할 자료를 받아보려는 ESG 전문 컨설턴트</div>
+        <ul class="utc-features">
+          <li>자가진단·컨설팅 보고서</li>
+          <li>증빙자료 PDF 전체 제공</li>
+          <li>전문가 검토 후 활용 권장</li>
+        </ul>
+      </button>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:20px;">
+    <button class="btn primary lg" id="startBtn" onclick="startDiagnosis()" disabled>
+      자가진단 시작하기 →
+    </button>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════ -->
+<!-- STEP 2: 기업 정보 입력 -->
+<!-- ═════════════════════════════════════════════════════════════ -->
+<div class="page-narrow" id="step-info" style="display:none;">
+  <div class="step-bar">
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">기업 정보 입력</div>
+    <div class="card-sub">진단 결과 보고서에 표시되는 기본 정보입니다.</div>
+
+    <div class="form-row">
+      <label class="form-label">기업명 <span class="req">*</span></label>
+      <input type="text" id="coName" class="input" placeholder="예) 한성테크">
+    </div>
+    <div class="form-row">
+      <label class="form-label">사업자등록번호 (선택)</label>
+      <input type="text" id="coBiz" class="input" placeholder="000-00-00000" maxlength="12">
+      <div class="input-help">10자리 사업자번호를 입력하면 자동으로 형식이 적용됩니다</div>
+      <div class="input-error" id="coBizErr" style="display:none;"></div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">기업 규모 <span class="req">*</span></label>
+      <select id="coSize" class="select">
+        <option value="소상공인">소상공인</option>
+        <option value="중소기업" selected>중소기업</option>
+        <option value="중견기업">중견기업</option>
+        <option value="대기업">대기업</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">업종 <span class="req">*</span></label>
+      <select id="coIndustry" class="select">
+        <option value="제조업" selected>제조업</option>
+        <option value="ICT/정보통신">ICT/정보통신</option>
+        <option value="건설업">건설업</option>
+        <option value="도소매업">도소매업</option>
+        <option value="기타서비스">기타서비스</option>
+      </select>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;justify-content:space-between;">
+    <button class="btn" onclick="goToStep('landing')">← 이전</button>
+    <button class="btn primary" onclick="goToDiagnosis()">진단 시작 →</button>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════ -->
+<!-- STEP 3: 30문항 진단 -->
+<!-- ═════════════════════════════════════════════════════════════ -->
+<div class="page-narrow" id="step-diag" style="display:none;">
+  <div class="q-area-tabs">
+    <button class="q-tab E" data-area="E" onclick="setArea('E')">🌱 환경 <span class="count" id="cnt-E">0/10</span></button>
+    <button class="q-tab S" data-area="S" onclick="setArea('S')">🤝 사회 <span class="count" id="cnt-S">0/10</span></button>
+    <button class="q-tab G" data-area="G" onclick="setArea('G')">🏛️ 거버넌스 <span class="count" id="cnt-G">0/10</span></button>
+  </div>
+
+  <div id="qList"></div>
+
+  <div class="q-nav">
+    <button class="btn" onclick="goToStep('info')">← 정보 수정</button>
+    <button class="btn primary" id="btnFinish" onclick="finishDiagnosis()" disabled>분석 시작 →</button>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════ -->
+<!-- STEP 4: 분석 진행 (AI) -->
+<!-- ═════════════════════════════════════════════════════════════ -->
+<div class="page-narrow" id="step-analyzing" style="display:none;">
+  <div class="analyzing">
+    <div class="spinner"></div>
+    <div class="analyzing-title">AI가 보고서를 작성하고 있습니다</div>
+    <div class="analyzing-sub">잠시만 기다려주세요. 약 30초 ~ 1분 소요됩니다.</div>
+    <div class="analyzing-stages" id="analyzingStages">
+      <div class="analyzing-stage" data-stage="predict"><span class="dot"></span><span>Stage 2 · 등급 예측 (GBM + SHAP)</span></div>
+      <div class="analyzing-stage" data-stage="consulting"><span class="dot"></span><span>Stage 3 · 컨설팅 보고서 생성 (RAG + KG)</span></div>
+      <div class="analyzing-stage" data-stage="evidence"><span class="dot"></span><span>Stage 3-E · 증빙자료 자동 작성</span></div>
+      <div class="analyzing-stage" data-stage="pdf"><span class="dot"></span><span>PDF 변환 및 저장</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════ -->
+<!-- STEP 5: RESULT (보고서 표시) -->
+<!-- ═════════════════════════════════════════════════════════════ -->
+<div class="page" id="step-result" style="display:none;">
+
+  <!-- 사용자 유형별 안내 -->
+  <div class="ai-warning" id="aiWarning"></div>
+
+  <!-- 결과 요약 카드 -->
+  <div class="result-summary">
+    <div class="result-summary-top">
+      <div>
+        <div class="result-company" id="rsCompany">-</div>
+        <div class="result-meta" id="rsMeta">-</div>
+      </div>
+      <div class="result-grade-block">
+        <div class="result-grade" id="rsGrade">-</div>
+        <div class="result-grade-label" id="rsGradeLabel">-</div>
+      </div>
+    </div>
+    <div class="result-score-line">
+      <div class="result-score-item">
+        <div class="result-score-label">종합 점수</div>
+        <div class="result-score-value" id="rsScore">- <span class="max">/100</span></div>
+      </div>
+      <div class="result-score-item">
+        <div class="result-score-label">우수 문항</div>
+        <div class="result-score-value" id="rsStrong">-</div>
+      </div>
+      <div class="result-score-item">
+        <div class="result-score-label">취약 문항</div>
+        <div class="result-score-value" id="rsWeak">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 영역별 카드 -->
+  <div class="area-grid" id="areaGrid"></div>
+
+  <!-- 탭 (자가진단 / 컨설팅 / 증빙) -->
+  <div class="tabs">
+    <button class="tab active" data-tab="self" onclick="setTab('self')">📋 자가진단 보고서</button>
+    <button class="tab" data-tab="consulting" onclick="setTab('consulting')">📝 컨설팅 보고서</button>
+    <button class="tab" data-tab="evidence" onclick="setTab('evidence')">📎 증빙자료</button>
+    <button class="tab" data-tab="download" onclick="setTab('download')">📥 다운로드</button>
+  </div>
+
+  <!-- 자가진단 보고서 -->
+  <div class="tab-panel active" data-tab="self">
+    <div class="report" id="reportSelf"></div>
+  </div>
+
+  <!-- 컨설팅 보고서 -->
+  <div class="tab-panel" data-tab="consulting">
+    <div class="report" id="reportConsulting"><div class="report-body" style="text-align:center;color:var(--g3);padding:60px;">컨설팅 보고서 생성 중...</div></div>
+  </div>
+
+  <!-- 증빙자료 -->
+  <div class="tab-panel" data-tab="evidence">
+    <div id="evidenceList"></div>
+  </div>
+
+  <!-- 다운로드 -->
+  <div class="tab-panel" data-tab="download">
+    <div class="download-grid" id="downloadGrid"></div>
+    <div style="text-align:center;margin-top:24px;">
+      <button class="btn lg" onclick="confirmReset()">처음부터 다시 시작</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PDF 렌더링용 숨김 영역 ─── -->
+<div class="pdf-render-area" id="pdfRenderArea"></div>
+
+<!-- ─── 모달 ─── -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">-</div>
+      <button class="btn-icon" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modalBody">-</div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<!-- ─── 토스트 ─── -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+ *  ESG 자가진단 컨설팅 플랫폼 v8.0
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* ═══ Supabase 연결 ═══ */
+let sb = null;
+try {
+  if (typeof supabase !== 'undefined' && supabase.createClient) {
+    sb = supabase.createClient(
+      'https://mwkdtasjkktqqlqefdhr.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13a2R0YXNqa2t0cXFscWVmZGhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NzkxNzQsImV4cCI6MjA4OTQ1NTE3NH0.hdYLzfThbBsFpGnTCvB4CEpm0BX0ZVrd4eMKkn7T_5g'
+    );
+  }
+} catch(e) { console.error('Supabase init failed:', e); }
+
+/* ═══ ESG 영역 / 등급 / 척도 ═══ */
+const AREAS = [
+  {id:'E', label:'환경', eng:'Environment', icon:'🌱', range:[0,10]},
+  {id:'S', label:'사회', eng:'Social', icon:'🤝', range:[10,20]},
+  {id:'G', label:'거버넌스', eng:'Governance', icon:'🏛️', range:[20,30]}
+];
+const GRADES = [
+  {min:80, grade:'A',  label:'선도(Leading)',       cls:'A'},
+  {min:70, grade:'B+', label:'우수(Performing)',     cls:'B'},
+  {min:60, grade:'B0', label:'양호(Stable)',         cls:'B'},
+  {min:50, grade:'B-', label:'보통(Developing)',     cls:'B'},
+  {min:35, grade:'C',  label:'관심(Introductory)',   cls:'C'},
+  {min:0,  grade:'D',  label:'미흡(Insufficient)',   cls:'D'}
+];
+const getGrade = s => GRADES.find(g => s >= g.min) || GRADES[GRADES.length-1];
+const SCALE_LABELS = ['매우\n미흡', '미흡', '보통', '우수', '매우\n우수'];
+
+const INDUSTRY_INSIGHT = {
+  '제조업':       {strength:'S/G 영역 상대적 우수', weakness:'E 영역 취약 (평균 3.19)', tip:'환경경영시스템(ISO 14001) 구축이 최우선. 에너지 절감·폐기물 관리부터 시작'},
+  'ICT/정보통신': {strength:'E/G 영역 균형적', weakness:'전반적 중상위, 세부 취약점 개선 필요', tip:'정보보안(G-05) 및 개인정보보호(S-10) 특화 강화'},
+  '건설업':       {strength:'E 영역 비교적 양호', weakness:'S/G 전반 취약, 제조업 대비 유의한 차이 (p=0.002)', tip:'안전보건(S-03/S-04) 긴급 강화. 산업안전보건법 중대재해 대응 필수'},
+  '도소매업':     {strength:'G 영역 보통 수준', weakness:'E 영역 최저 수준', tip:'소비자 개인정보보호(S-10)와 공급망 ESG(S-07) 중점 개선'},
+  '기타서비스':   {strength:'E/S/G 균형적', weakness:'환경 영역 상대적 취약', tip:'서비스업 특성상 인력관리(S-05/S-06)와 윤리경영(G-01) 집중'}
+};
+
+/* ═══ 30문항 ═══ */
+const QS = [
+  {c:'E-01', t:'환경경영 방침이 서면으로 제정·승인되어 있습니까?',                a:'E', help:'ISO 14001 기반 환경경영 방침을 서면 제정, 최고경영자 승인 후 전 직원 공표', docs:['환경경영방침서','환경경영 선언문','이사회 승인 의사록'], law:'환경정책기본법 제2조',         guide:'K-ESG E-1-1', template:'환경경영방침서: ①환경경영 비전, ②오염예방 의지, ③법규준수 서약, ④지속적 개선 약속'},
+  {c:'E-02', t:'환경목표와 KPI가 연간 계획으로 수립되어 있습니까?',                a:'E', help:'에너지 사용량, 폐기물 발생량 등 정량적 환경목표를 연간 계획에 포함',           docs:['환경목표 관리대장','연간 환경계획서'],                    law:'환경기술산업법 제17조',     guide:'K-ESG E-1-2', template:'연간 계획서: 전년 대비 에너지 5% 절감, 폐기물 재활용률 70% 달성'},
+  {c:'E-03', t:'최근 12개월 환경 성과관리표를 보유하고 있습니까?',                  a:'E', help:'Scope1/2 배출량, 에너지·용수 사용량 월별 집계 관리',                          docs:['환경성과 관리표','에너지 사용 집계표'],                  law:'온실가스배출권법',          guide:'K-ESG E-2',   template:'월별 집계표: 전력(kWh), 가스(Nm³), 용수(톤), 폐기물(톤), GHG(tCO2eq)'},
+  {c:'E-04', t:'대기배출시설 보유 시 자가측정·점검을 수행합니까?',                  a:'E', help:'대기환경보전법에 따라 반기 1회 이상 자가측정 수행',                            docs:['자가측정 결과서','대기배출시설 신고서'],                  law:'대기환경보전법 제39조',     guide:'K-ESG E-3',   template:'자가측정 항목: 먼지, SOx, NOx, 배출허용기준 대비 측정값 기록'},
+  {c:'E-05', t:'폐수배출 또는 위탁처리를 적정하게 관리합니까?',                    a:'E', help:'물환경보전법에 따라 폐수배출시설 허가/신고 및 처리 기준 준수',                docs:['폐수 위탁처리 계약서','수질측정 결과서'],                law:'물환경보전법 제33조',       guide:'K-ESG E-3',   template:'폐수처리 기록부: 배출량(톤/일), BOD/COD 측정값, 위탁처리업체 정보'},
+  {c:'E-06', t:'유해화학물질(MSDS) 관리체계를 보유하고 있습니까?',                  a:'E', help:'화학물질관리법에 따라 MSDS 비치, 취급자 교육 실시',                            docs:['MSDS 비치 목록','화학물질 교육 이수증'],                  law:'화학물질관리법',            guide:'K-ESG E-4',   template:'MSDS 관리대장: 물질명, CAS번호, 보관량, 보관 위치, 교육일시'},
+  {c:'E-07', t:'폐기물 분류·처리가 기준에 맞게 관리됩니까?',                       a:'E', help:'일반/지정폐기물 구분, 적법 처리업체 위탁 처리',                                docs:['폐기물 위탁처리 계약서','폐기물 관리대장'],                law:'폐기물관리법',              guide:'K-ESG E-5',   template:'폐기물 관리대장: 종류, 발생량, 처리방법, 위탁업체, 인수인계서'},
+  {c:'E-08', t:'연간 에너지 사용량 집계 및 절감활동을 수행합니까?',                a:'E', help:'에너지원별 사용량 집계, 절감 목표·활동 수행',                                  docs:['에너지 사용량 집계표','절감활동 보고서'],                law:'에너지이용합리화법',        guide:'K-ESG E-2',   template:'에너지 절감활동: LED 교체, 공조기 인버터, 압축공기 누설 점검'},
+  {c:'E-09', t:'Scope 1/2 배출 인벤토리를 보유하고 있습니까?',                      a:'E', help:'직접배출(Scope1)·간접배출(Scope2) 구분 산정',                                docs:['온실가스 인벤토리','배출량 검증 보고서'],                law:'온실가스배출권법',          guide:'K-ESG E-2',   template:'GHG 인벤토리: Scope1(보일러,차량), Scope2(전력), 배출계수 적용, 연간 총량'},
+  {c:'E-10', t:'환경 관련 연간 교육계획 및 이행을 수행합니까?',                    a:'E', help:'환경 법규, 비상대응 절차 등 연간 교육 계획·실시',                              docs:['환경교육 계획서','교육 이수 증빙'],                      law:'환경교육진흥법',            guide:'K-ESG E-6',   template:'교육계획: 환경법규(2h), 비상대응(2h), 신입사원 OJT(1h)'},
+  {c:'S-01', t:'인권경영 선언문/정책을 보유하고 공표했습니까?',                    a:'S', help:'UN 인권경영 원칙 참고, 인권경영 방침 수립·공표',                              docs:['인권경영 선언문','인권정책 게시 확인'],                  law:'국가인권위원회법',          guide:'K-ESG S-1-1', template:'인권경영 선언문: 강제노동 금지, 아동노동 금지, 차별금지, 결사의 자유 보장'},
+  {c:'S-02', t:'임직원 고충·신고·구제 절차가 운영되고 있습니까?',                  a:'S', help:'고충처리위원회 또는 신고 채널 운영, 처리 절차 마련',                          docs:['고충처리 규정','신고 접수 대장'],                          law:'근로기준법 제76조',         guide:'K-ESG S-1-2', template:'고충처리 절차: 접수→조사(5일)→심의→조치→통보→사후관리'},
+  {c:'S-03', t:'안전보건방침 수립 및 위험성평가를 정기 수행합니까?',                a:'S', help:'산업안전보건법에 따라 위험성평가 연 1회 이상 실시',                            docs:['안전보건방침','위험성평가 보고서'],                      law:'산업안전보건법 제36조',     guide:'K-ESG S-2',   template:'위험성평가: 위험요인 파악→위험성 추정→결정→대책수립→기록'},
+  {c:'S-04', t:'비상대응 절차 및 모의훈련을 실시합니까?',                          a:'S', help:'화재·누출 등 비상상황 대응 절차 수립, 연 1회 이상 모의훈련',                  docs:['비상대응 매뉴얼','모의훈련 실시 결과'],                  law:'산업안전보건법',            guide:'K-ESG S-2',   template:'비상대응: 시나리오, 훈련계획, 실시결과, 개선사항'},
+  {c:'S-05', t:'근로계약, 임금, 근로시간 관리가 법정 기준에 부합합니까?',          a:'S', help:'근로기준법 근로계약서 작성, 최저임금 준수, 법정 근로시간 준수',                docs:['표준근로계약서','임금대장'],                              law:'근로기준법',                guide:'K-ESG S-3',   template:'점검항목: 근로계약서 교부, 최저임금 이상, 주52시간, 연차수당 지급'},
+  {c:'S-06', t:'차별금지·평등정책을 수립·교육하고 있습니까?',                      a:'S', help:'성별·연령·장애 등 차별 금지 정책 수립·교육',                                  docs:['평등정책 규정','교육 이수 현황'],                          law:'남녀고용평등법',            guide:'K-ESG S-3',   template:'평등정책: 채용·승진·보상 기준 공개, 성별 임금격차 현황, 교육실시'},
+  {c:'S-07', t:'협력사 행동규범(CoC) 및 서약을 운영합니까?',                        a:'S', help:'협력사 ESG 행동규범 제정, 이행 서약 수령',                                    docs:['협력사 CoC','이행 서약서'],                              law:'하도급법',                  guide:'K-ESG S-4',   template:'협력사 CoC: 인권·노동·환경·윤리 준수항목 + 위반 시 제재 + 연간 점검'},
+  {c:'S-08', t:'연간 인권/안전/윤리 등 사회분야 교육을 수행합니까?',                a:'S', help:'직장 내 괴롭힘 예방, 안전보건, 개인정보보호 등 법정 교육 실시',                docs:['교육계획서','교육 이수 대장'],                            law:'산업안전보건법 등',         guide:'K-ESG S-5',   template:'법정교육: 성희롱예방, 괴롭힘예방, 개인정보, 안전보건(6h이상)'},
+  {c:'S-09', t:'지역사회 공헌 활동을 수행합니까?',                                  a:'S', help:'봉사활동, 기부, 지역경제 기여 등 사회공헌',                                    docs:['사회공헌 활동 보고','기부금 영수증'],                      law:'-',                          guide:'K-ESG S-6',   template:'사회공헌 계획: 연 2회 봉사활동, 매출 0.5% 기부, 지역 채용 비율 관리'},
+  {c:'S-10', t:'개인정보 처리방침을 수립·공지하고 준수합니까?',                    a:'S', help:'개인정보보호법에 따라 처리방침 수립, 홈페이지 등 공개',                        docs:['개인정보 처리방침','개인정보 관리대장'],                  law:'개인정보보호법',            guide:'K-ESG S-7',   template:'처리방침 필수항목: 수집목적, 항목, 보유기간, 파기방법, 위탁현황, 책임자'},
+  {c:'G-01', t:'윤리강령 및 부패방지 정책을 수립·교육합니까?',                      a:'G', help:'임직원 윤리강령 제정, 연 1회 이상 부패방지 교육',                              docs:['윤리강령','부패방지 교육 증빙'],                          law:'청탁금지법',                guide:'K-ESG G-1',   template:'윤리강령: 금품수수금지, 이해충돌방지, 공정거래, 위반 시 징계규정'},
+  {c:'G-02', t:'ESG 책임자가 지정되어 정기 보고합니까?',                            a:'G', help:'ESG 전담 책임자(또는 위원회) 지정, 경영진 정기 보고',                          docs:['ESG 위원회 구성안','정기보고 회의록'],                    law:'-',                          guide:'K-ESG G-2',   template:'ESG 위원회: 구성(대표이사+각부서장), 분기 1회 개최, 안건·의결 기록'},
+  {c:'G-03', t:'법규 준수 및 ESG 리스크 관리 절차를 운영합니까?',                  a:'G', help:'ESG 법규 준수 점검, 리스크 식별·관리 절차 운영',                              docs:['컴플라이언스 체크리스트','리스크 관리 대장'],              law:'공정거래법',                guide:'K-ESG G-3',   template:'리스크 관리: 법규변경 모니터링, 리스크맵, 분기별 점검'},
+  {c:'G-04', t:'공정거래 준수 프로그램을 운영합니까?',                              a:'G', help:'하도급·대리점 거래 공정거래 규정 준수 프로그램',                              docs:['CP 운영 규정','공정거래 교육 증빙'],                      law:'공정거래법',                guide:'K-ESG G-3',   template:'CP 프로그램: 자율준수관리자 지정, 교육 연 2회, 내부감시체계, 제재절차'},
+  {c:'G-05', t:'정보보안 정책 및 점검 절차를 운영합니까?',                          a:'G', help:'정보보안 정책 수립, 정기 취약점 점검 수행',                                    docs:['정보보안 정책','보안점검 결과서'],                        law:'정보통신망법',              guide:'K-ESG G-4',   template:'보안점검: 분기 1회 취약점 스캔, 연 1회 모의해킹, 백업 주기, 접근통제'},
+  {c:'G-06', t:'내부신고 제도 및 신고자 보호절차를 운영합니까?',                    a:'G', help:'부정행위 신고 채널 및 신고자 보호 절차 운영',                                  docs:['내부신고 규정','신고자 보호 지침'],                      law:'공익신고자보호법',          guide:'K-ESG G-5',   template:'신고제도: 신고채널, 익명보장, 보호조치, 처리기한(30일)'},
+  {c:'G-07', t:'개인정보보호 책임자 지정 및 접근·권한 관리를 수행합니까?',          a:'G', help:'CPO 지정, 접근 권한 관리',                                                      docs:['CPO 지정 공문','접근권한 관리대장'],                      law:'개인정보보호법',            guide:'K-ESG G-6',   template:'CPO 업무: 처리방침 관리, 접근권한 부여/변경/해제, 위탁업체 감독'},
+  {c:'G-08', t:'ESG 관련 정책·절차·기록 문서의 버전관리를 운영합니까?',              a:'G', help:'ESG 문서 제·개정 이력 관리, 최신 버전 유지',                                    docs:['문서관리 규정','버전관리 대장'],                          law:'-',                          guide:'K-ESG G-7',   template:'문서관리: 제·개정번호 체계, 승인절차, 배포관리, 폐기절차, 보존기간'},
+  {c:'G-09', t:'ESG 정책/성과를 홈페이지 등 외부에 공시합니까?',                    a:'G', help:'ESG 정책·성과를 홈페이지, 지속가능보고서 등 공개',                            docs:['홈페이지 ESG 페이지','지속가능보고서'],                  law:'-',                          guide:'K-ESG G-8',   template:'공시항목: ESG 방침, 목표/성과, GHG 배출량, 사회공헌 실적, 지배구조 현황'},
+  {c:'G-10', t:'임직원 대상 윤리/정보보안/개인정보 교육을 실시합니까?',              a:'G', help:'윤리·정보보안·개인정보보호 법정 교육 연 1회 이상',                            docs:['교육계획서','교육 이수 현황'],                            law:'개인정보보호법 등',         guide:'K-ESG G-9',   template:'교육계획: 윤리(2h), 정보보안(2h), 개인정보(1h), 신입교육(4h)'}
+];
+
+/* ═══ 전역 상태 ═══ */
+const state = {
+  step: 'landing',
+  userType: null,            // 'company' | 'consultant'
+  company: { name:'', biz:'', size:'중소기업', industry:'제조업' },
+  answers: new Array(30).fill(0),
+  currentArea: 'E',
+  diagnosisId: null,         // Supabase에서 받은 진단 ID
+  result: null,              // 점수 산출 결과
+  consultingReport: null,    // AI 컨설팅 보고서 텍스트
+  evidenceDocs: [],          // 증빙자료 [{code,title,question,content}]
+  pdfs: {                    // 생성된 PDF Blob
+    self: null,
+    consulting: null,
+    evidence: []
+  },
+  uploads: {                 // Storage 업로드 결과 경로
+    self: null,
+    consulting: null,
+    evidence: []
+  }
+};
+
+/* ═══ 유틸 ═══ */
+function $(sel){ return document.querySelector(sel); }
+function $$(sel){ return document.querySelectorAll(sel); }
+function toast(msg, ms=2500){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+function showModal(title, body, actions){
+  $('#modalTitle').textContent = title;
+  $('#modalBody').innerHTML = body;
+  $('#modalActions').innerHTML = '';
+  if (actions && actions.length) {
+    actions.forEach(a => {
+      const btn = document.createElement('button');
+      btn.className = 'btn ' + (a.cls || '');
+      btn.textContent = a.label;
+      btn.onclick = () => {
+        if (a.action) a.action();
+        if (a.close !== false) closeModal();
+      };
+      $('#modalActions').appendChild(btn);
+    });
+  }
+  $('#modal').classList.add('show');
+}
+function closeModal(){ $('#modal').classList.remove('show'); }
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ═══ Step 전환 ═══ */
+function goToStep(step){
+  state.step = step;
+  ['landing','info','diag','analyzing','result'].forEach(s => {
+    const el = $('#step-' + s);
+    if (el) el.style.display = (s === step) ? '' : 'none';
+  });
+  $('#qProgress').style.display = (step === 'diag') ? '' : 'none';
+  $('#resetBtn').style.display = (step === 'landing') ? 'none' : '';
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+/* ═══ STEP 1: 사용자 유형 선택 ═══ */
+function selectUserType(type){
+  state.userType = type;
+  $$('.user-type-card').forEach(c => c.classList.remove('selected'));
+  $('#utc-' + type).classList.add('selected');
+  $('#startBtn').disabled = false;
+}
+
+function startDiagnosis(){
+  if (!state.userType) return;
+  goToStep('info');
+}
+
+/* ═══ STEP 2: 기업 정보 입력 ═══ */
+function formatBiz(v){
+  const d = v.replace(/\D/g, '').slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 5) return d.slice(0,3) + '-' + d.slice(3);
+  return d.slice(0,3) + '-' + d.slice(3,5) + '-' + d.slice(5);
+}
+function validateBiz(v){
+  const d = v.replace(/\D/g, '');
+  if (d.length === 0) return '';
+  if (d.length !== 10) return '사업자등록번호는 10자리입니다.';
+  const weights = [1,3,7,1,3,7,1,3,5];
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(d[i]) * weights[i];
+  sum += Math.floor(parseInt(d[8]) * 5 / 10);
+  const check = (10 - sum % 10) % 10;
+  if (check !== parseInt(d[9])) return '유효하지 않은 사업자등록번호입니다.';
+  return '';
+}
+$('#coBiz').addEventListener('input', e => {
+  const v = formatBiz(e.target.value);
+  e.target.value = v;
+  state.company.biz = v;
+  const err = validateBiz(v);
+  $('#coBizErr').style.display = err ? '' : 'none';
+  $('#coBizErr').textContent = err;
+  e.target.classList.toggle('error', !!err);
+});
+
+function goToDiagnosis(){
+  state.company.name = $('#coName').value.trim();
+  state.company.biz = $('#coBiz').value.trim();
+  state.company.size = $('#coSize').value;
+  state.company.industry = $('#coIndustry').value;
+  if (!state.company.name) {
+    toast('기업명을 입력해주세요');
+    $('#coName').focus();
+    return;
+  }
+  if (state.company.biz && validateBiz(state.company.biz)) {
+    toast(validateBiz(state.company.biz));
+    return;
+  }
+  renderQuestions();
+  goToStep('diag');
+}
+
+/* ═══ STEP 3: 30문항 진단 ═══ */
+function renderQuestions(){
+  setArea('E');
+  updateProgress();
+}
+
+function setArea(area){
+  state.currentArea = area;
+  $$('.q-tab').forEach(t => t.classList.toggle('active', t.dataset.area === area));
+  const ar = AREAS.find(a => a.id === area);
+  const html = QS.slice(ar.range[0], ar.range[1]).map((q, i) => {
+    const idx = ar.range[0] + i;
+    const cur = state.answers[idx];
+    const scale = SCALE_LABELS.map((lbl, n) => `
+      <button class="q-scale-btn ${cur === n+1 ? 'selected' : ''}" onclick="setAnswer(${idx}, ${n+1})">
+        <span class="num">${n+1}</span>
+        <span class="lbl">${lbl}</span>
+      </button>`).join('');
+    return `
+      <div class="q-card">
+        <div class="q-card-head">
+          <span class="q-code">${q.c}</span>
+          <span class="q-text">${escapeHtml(q.t)}</span>
+        </div>
+        <div class="q-help"><b>📌 평가 기준</b><br>${escapeHtml(q.help)}</div>
+        <div class="q-scale">${scale}</div>
+        <div class="q-evidence">
+          <span style="color:var(--g3);">근거: ${escapeHtml(q.law)} · ${escapeHtml(q.guide)}</span>
+        </div>
+      </div>`;
+  }).join('');
+  $('#qList').innerHTML = html;
+  window.scrollTo({top: $('#qProgress').offsetTop - 16, behavior: 'smooth'});
+}
+
+function setAnswer(idx, val){
+  state.answers[idx] = val;
+  updateProgress();
+  // 시각 업데이트
+  setArea(state.currentArea);
+  // 마지막 응답이었으면 분석 시작 가능 표시
+  if (state.answers.filter(v => v > 0).length === 30) {
+    $('#btnFinish').disabled = false;
+  }
+}
+
+function updateProgress(){
+  const cnt = state.answers.filter(v => v > 0).length;
+  const pct = Math.round(cnt / 30 * 100);
+  $('#qProgressFill').style.width = pct + '%';
+  $('#qProgressText').textContent = cnt + ' / 30 문항 응답';
+  $('#qProgressPct').textContent = pct + '%';
+  $('#btnFinish').disabled = cnt < 30;
+  // 영역별 카운트
+  AREAS.forEach(a => {
+    const ans = state.answers.slice(a.range[0], a.range[1]).filter(v => v > 0).length;
+    $('#cnt-' + a.id).textContent = ans + '/10';
+  });
+}
+
+function finishDiagnosis(){
+  if (state.answers.filter(v => v > 0).length < 30) {
+    toast('30문항 모두 응답해주세요');
+    return;
+  }
+  goToStep('analyzing');
+  runAnalysis();
+}
+
+/* ═══ STEP 4: 분석 실행 ═══ */
+function predict(answers){
+  const calc = (rng) => {
+    const s = answers.slice(rng[0], rng[1]);
+    return +(s.reduce((a, b) => a + b, 0) / 10).toFixed(2);
+  };
+  const eA = calc([0,10]);
+  const sA = calc([10,20]);
+  const gA = calc([20,30]);
+  const total = +((eA + sA + gA) / 3).toFixed(2);
+  const score = Math.round(total * 20);
+  const strong = answers.filter(v => v >= 4).length;
+  const weak = answers.filter(v => v <= 2).length;
+  const weakItems = answers
+    .map((v, i) => ({...QS[i], idx:i, score:v}))
+    .filter(x => x.score <= 2)
+    .sort((a, b) => a.score - b.score);
+  return {
+    score, eA, sA, gA, total, strong, weak,
+    weakItems, ...getGrade(score)
+  };
+}
+
+function setAnalyzingStage(stage, status){
+  $$('.analyzing-stage').forEach(s => {
+    if (s.dataset.stage === stage) {
+      s.classList.remove('active','done');
+      s.classList.add(status);
+    }
+  });
+}
+
+async function runAnalysis(){
+  try {
+    // Stage 2: 등급 예측
+    setAnalyzingStage('predict', 'active');
+    state.result = predict(state.answers);
+    await sleep(800);
+    setAnalyzingStage('predict', 'done');
+
+    // Supabase 저장 (1차: 점수만)
+    setAnalyzingStage('consulting', 'active');
+    await saveToDb();
+
+    // Stage 3: 컨설팅 보고서 (AI)
+    state.consultingReport = await generateConsultingReport();
+    setAnalyzingStage('consulting', 'done');
+
+    // Stage 3-E: 증빙자료 (AI)
+    setAnalyzingStage('evidence', 'active');
+    await generateEvidenceDocs();
+    setAnalyzingStage('evidence', 'done');
+
+    // PDF 생성·업로드
+    setAnalyzingStage('pdf', 'active');
+    await generateAllPdfs();
+    setAnalyzingStage('pdf', 'done');
+
+    await sleep(500);
+
+    // 결과 화면
+    renderResult();
+    goToStep('result');
+  } catch (e) {
+    console.error(e);
+    showModal('오류', '분석 중 오류가 발생했습니다: <br><br><code style="font-size:11px;color:var(--hitl);">' + escapeHtml(e.message) + '</code>', [
+      {label: '다시 시도', cls: 'primary', action: () => { goToStep('diag'); }},
+      {label: '닫기', cls: ''}
+    ]);
+  }
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+/* ═══ Supabase 저장 (1차) ═══ */
+async function saveToDb(){
+  if (!sb) return;
+  const r = state.result;
+  try {
+    const { data, error } = await sb.from('diagnosis_results').insert({
+      company_name: state.company.name,
+      company_biz: state.company.biz || null,
+      company_size: state.company.size,
+      company_industry: state.company.industry,
+      score: r.score,
+      grade: r.grade,
+      grade_label: r.label,
+      e_score: r.eA,
+      s_score: r.sA,
+      g_score: r.gA,
+      strong_count: r.strong,
+      weak_count: r.weak,
+      answers: state.answers,
+      user_type: state.userType
+    }).select().single();
+    if (error) throw error;
+    state.diagnosisId = data.id;
+  } catch (e) {
+    console.warn('DB 저장 실패 (분석은 계속):', e);
+  }
+}
+
+/* ═══ AI 컨설팅 보고서 생성 ═══ */
+async function generateConsultingReport(){
+  const r = state.result;
+  const co = state.company;
+  const ind = INDUSTRY_INSIGHT[co.industry] || INDUSTRY_INSIGHT['제조업'];
+  const weakDetail = AREAS.map(a => {
+    const items = r.weakItems.filter(w => w.a === a.id);
+    if (!items.length) return '';
+    return `[${a.label}(${a.id}) 취약문항]\n` + items.map(w =>
+      `- ${w.c}(${w.score}점): ${w.t}\n  관련법규: ${w.law}\n  필요서류: ${w.docs.join(', ')}`
+    ).join('\n');
+  }).filter(Boolean).join('\n\n');
+
+  const prompt = `당신은 ${co.industry} 분야 중소기업 ESG 전문 컨설턴트입니다.
+"${co.name}" 맞춤형 ESG 컨설팅 보고서를 작성하세요.
+
+[기업 정보]
+- 기업명: ${co.name} | 산업: ${co.industry} | 규모: ${co.size}
+- ESG 종합: ${r.score}점 (${r.grade} ${r.label})
+- E: ${r.eA}/5.0 | S: ${r.sA}/5.0 | G: ${r.gA}/5.0
+- 우수문항: ${r.strong}개 | 취약문항: ${r.weak}개
+
+[산업 특성]
+- 강점: ${ind.strength}
+- 약점: ${ind.weakness}
+- 권고: ${ind.tip}
+
+${weakDetail}
+
+[작성 지침 — 매우 중요]
+1. **표만 사용하지 말고 서술형 설명을 충분히 포함하세요.** 표는 보조 자료로만 사용.
+2. 각 섹션은 3~5개의 자연스러운 문단으로 구성하세요. 한 문단은 3~5문장.
+3. 다음 5개 품질 차원을 충족하도록 작성하세요:
+   - **구체성**: 수치(목표치, 기한, KPI), 담당자(부서/역할)를 반드시 명시
+   - **실행가능성**: 중소기업 자원 범위 내 가능한 권고 (대기업 전제 권고 X)
+   - **산업적합성**: ${co.industry} 업종의 핵심 ESG 이슈를 명시적으로 반영
+   - **구조화**: 단기(0~3개월)/중기(3~12개월)/장기(1년+) 우선순위 명확
+   - **추적가능성**: 법률명·조항·인증기준을 정확히 인용 (예: 산업안전보건법 §29)
+
+# ${co.name} ESG 맞춤 컨설팅 보고서
+
+## 1. 종합 진단
+
+(2~3문단으로 작성)
+- 현재 ESG 등급의 의미와 산업 내 상대적 위치 해석
+- 핵심 강점 3가지 (왜 강점인지 설명)
+- 시급한 과제 3가지 (왜 시급한지 + 미개선 시 리스크)
+
+## 2. 영역별 상세 진단
+
+### 2.1 환경(E) 영역 — ${r.eA}/5.0
+(2~3문단 + 핵심 취약문항 표)
+- 환경 영역 현황 평가
+- 가장 시급한 개선 과제 1~2개 (관련 법규 인용 포함)
+- 중소기업 ${co.industry} 관점의 우선순위
+
+### 2.2 사회(S) 영역 — ${r.sA}/5.0
+(2~3문단 + 핵심 취약문항 표)
+
+### 2.3 거버넌스(G) 영역 — ${r.gA}/5.0
+(2~3문단 + 핵심 취약문항 표)
+
+## 3. 우선 개선 과제 (Top 5)
+
+(각 과제마다 다음 형식으로 서술)
+### 과제 1: [과제명]
+- **현황**: 현재 상태 1~2문장 서술
+- **개선 목표**: 정량 지표 + 기한 명시
+- **실행 방안**: 단계별 절차 (1~3단계로 서술)
+- **담당 부서**: 책임 부서/역할 명시
+- **법규 근거**: 관련 법률·조항 정확히 명시
+- **예상 효과**: 개선 시 기대 효과
+
+(과제 2~5도 동일 형식)
+
+## 4. 단계별 실행 로드맵
+
+### 단기 (0~3개월) — Quick Wins
+- (3~5개 항목, 각 항목 1~2문장 설명 포함)
+
+### 중기 (3~12개월) — 시스템 구축
+- (3~5개 항목, 각 항목 설명 포함)
+
+### 장기 (1년+) — 지속가능 체계
+- (2~3개 항목, 각 항목 설명 포함)
+
+## 5. 출처 및 참고
+
+- 중소기업 ESG 자가진단 실증 분석
+- K-ESG 가이드라인 v2.0 (산업통상자원부)
+- 중소기업중앙회 ESG 규정례
+- 관련 법규는 본문에 명시한 조항 참조
+
+[중요] 마크다운 형식으로 작성하되, 표는 핵심 정보 요약에만 사용하고 본문은 서술형으로 충분히 풀어쓰세요.`;
+
+  try {
+    const res = await fetch('/api/consulting', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt, max_tokens: 8000})
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.text || '';
+  } catch (e) {
+    console.error('컨설팅 보고서 생성 실패:', e);
+    return '## 보고서 생성 실패\n\n시스템 오류로 보고서를 생성할 수 없었습니다.\n다시 시도해주세요.\n\n오류: ' + e.message;
+  }
+}
+
+/* ═══ AI 증빙자료 생성 ═══ */
+async function generateEvidenceDocs(){
+  const r = state.result;
+  // 취약문항(2점 이하) 중 상위 5개에 대해 증빙자료 생성
+  const targets = r.weakItems.slice(0, 5);
+  if (!targets.length) {
+    state.evidenceDocs = [];
+    return;
+  }
+
+  const co = state.company;
+  state.evidenceDocs = [];
+
+  for (const w of targets) {
+    const prompt = `"${co.name}" (${co.industry}, ${co.size})의 ESG 자가진단에서 "${w.c}: ${w.t}" 항목이 취약(${w.score}점)으로 나왔습니다.
+이 항목의 증빙으로 제출할 수 있는 "${w.docs[0]}" 문서를 작성해주세요.
+
+[필수 작성 규칙]
+1. 기업명 "${co.name}", 작성자/담당자 성명란은 모두 "○○○" 표기
+2. 연락처/이메일 등 임의 데이터는 반드시 "(예시)" 표기
+3. 마크다운 형식으로 작성. 제목은 ## (h2)와 ### (h3) 사용
+4. 수치 데이터는 마크다운 표 사용. 열 수 일정하게 유지
+5. 승인란은 반드시 다음 표 형식으로:
+| 구분 | 성명 | 서명 | 일자 |
+|------|------|------|------|
+| 작성 | ○○○ | (서명) | ${new Date().toISOString().slice(0,10)} |
+| 검토 | ○○○ | (서명) | |
+| 승인 | ○○○ | (서명) | |
+6. 관련법규: ${w.law} | K-ESG: ${w.guide}
+7. 작성가이드: ${w.template}
+8. 별첨 양식이 필요하면 문서 끝에 "[별첨] 양식명" 표시
+9. 문서는 완전한 형태로 작성 (잘림 없이)`;
+
+    try {
+      const res = await fetch('/api/consulting', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({prompt, max_tokens: 3000})
+      });
+      const data = await res.json();
+      state.evidenceDocs.push({
+        code: w.c,
+        title: w.docs[0],
+        question: w.t,
+        content: data.text || '생성 실패'
+      });
+    } catch (e) {
+      console.error('증빙자료 생성 실패:', w.c, e);
+      state.evidenceDocs.push({
+        code: w.c,
+        title: w.docs[0],
+        question: w.t,
+        content: '생성 실패: ' + e.message
+      });
+    }
+  }
+}
+
+/* ═══ PDF 생성 (jsPDF + html2canvas) ═══ */
+async function htmlToPdf(htmlString, filename){
+  const renderArea = $('#pdfRenderArea');
+  renderArea.innerHTML = htmlString;
+  const target = renderArea.firstElementChild;
+
+  // html2canvas로 캔버스 생성
+  const canvas = await html2canvas(target, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false
+  });
+
+  // jsPDF로 PDF 생성 (A4 세로)
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = pdf.internal.pageSize.getHeight();
+
+  const imgWidth = pdfWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pdfHeight;
+
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pdfHeight;
+  }
+
+  renderArea.innerHTML = '';
+  return pdf.output('blob');
+}
+
+async function uploadPdfToStorage(blob, path){
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb.storage
+      .from('esg-reports')
+      .upload(path, blob, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+    if (error) throw error;
+    return data.path;
+  } catch (e) {
+    console.error('Storage 업로드 실패:', path, e);
+    return null;
+  }
+}
+
+async function generateAllPdfs(){
+  const did = state.diagnosisId || ('temp-' + Date.now());
+
+  // 1. 자가진단 보고서 PDF
+  const selfHtml = renderSelfAssessmentReportHtml();
+  state.pdfs.self = await htmlToPdf(selfHtml, `${state.company.name}_자가진단_보고서.pdf`);
+  state.uploads.self = await uploadPdfToStorage(state.pdfs.self, `${did}/self-assessment.pdf`);
+
+  // 2. 컨설팅 보고서 PDF
+  const consHtml = renderConsultingReportHtml();
+  state.pdfs.consulting = await htmlToPdf(consHtml, `${state.company.name}_컨설팅_보고서.pdf`);
+  state.uploads.consulting = await uploadPdfToStorage(state.pdfs.consulting, `${did}/consulting.pdf`);
+
+  // 3. 증빙자료 PDF (각각)
+  state.uploads.evidence = [];
+  for (const doc of state.evidenceDocs) {
+    const html = renderEvidenceHtml(doc);
+    const blob = await htmlToPdf(html, `${doc.code}.pdf`);
+    state.pdfs.evidence.push({code: doc.code, title: doc.title, blob});
+    const path = await uploadPdfToStorage(blob, `${did}/evidence/${doc.code}.pdf`);
+    state.uploads.evidence.push({code: doc.code, title: doc.title, path});
+  }
+
+  // 4. Supabase에 PDF 경로 업데이트
+  if (sb && state.diagnosisId) {
+    try {
+      await sb.from('diagnosis_results').update({
+        self_assessment_pdf: state.uploads.self,
+        consulting_pdf: state.uploads.consulting,
+        evidence_pdfs: state.uploads.evidence
+      }).eq('id', state.diagnosisId);
+    } catch (e) {
+      console.warn('PDF 경로 업데이트 실패:', e);
+    }
+  }
+}
+
+/* ═══ 보고서 HTML 생성 ═══ */
+function renderSelfAssessmentReportHtml(){
+  const r = state.result;
+  const co = state.company;
+  const ind = INDUSTRY_INSIGHT[co.industry] || INDUSTRY_INSIGHT['제조업'];
+  const today = new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'});
+
+  // 영역별 분석
+  const areaAnalysis = AREAS.map(a => {
+    const v = a.id === 'E' ? r.eA : a.id === 'S' ? r.sA : r.gA;
+    const sc = Math.round(v * 20);
+    const g = getGrade(sc);
+    const items = QS.slice(a.range[0], a.range[1]).map((q, i) => {
+      const sv = state.answers[a.range[0] + i];
+      return {q, sv, g: getGrade(Math.round(sv*20))};
+    });
+    const strongItems = items.filter(x => x.sv >= 4);
+    const weakItems = items.filter(x => x.sv <= 2);
+
+    let analysis = '';
+    if (sc >= 70) analysis = `${a.label} 영역은 ${g.label} 수준으로 ${co.industry} 업종 내에서 양호한 위치에 있습니다. 다만 일부 세부 항목에서 추가 개선 여지가 있어, 현재 수준을 유지하면서 약점 영역을 보완하는 전략이 효과적입니다.`;
+    else if (sc >= 50) analysis = `${a.label} 영역은 ${g.label} 수준으로 기본 체계는 갖추어져 있으나 보완이 필요한 상태입니다. 특히 취약 문항들을 중심으로 단계적 개선이 요구되며, 향후 12개월 내 시스템적 보강을 통해 한 단계 상위 등급으로 진입할 수 있습니다.`;
+    else analysis = `${a.label} 영역은 ${g.label} 수준으로 즉각적인 개선 조치가 필요한 상태입니다. ${weakItems.length}개의 취약 문항이 식별되었으며, 관련 법규 위반 리스크도 존재할 수 있어 우선적인 대응이 권고됩니다.`;
+
+    const tableRows = items.map(x => `
+      <tr>
+        <td style="font-family:monospace;color:#3F8CAA;font-weight:600;">${x.q.c}</td>
+        <td>${escapeHtml(x.q.t)}</td>
+        <td style="text-align:center;font-weight:700;">${x.sv}</td>
+        <td style="text-align:center;color:${x.sv >= 4 ? '#15803D' : x.sv <= 2 ? '#C0392B' : '#4A5270'};font-weight:700;">${x.sv >= 4 ? '우수' : x.sv <= 2 ? '취약' : '보통'}</td>
+      </tr>`).join('');
+
+    return `
+      <div style="margin-bottom:32px;page-break-inside:avoid;">
+        <h2 style="font-size:18px;color:#002555;border-bottom:2px solid ${a.id==='E'?'#15803d':a.id==='S'?'#2563EB':'#7c3aed'};padding-bottom:6px;margin-bottom:12px;">
+          ${a.icon} ${a.label} (${a.eng}) — ${sc}점 (${g.grade})
+        </h2>
+        <p style="font-size:13px;line-height:1.8;color:#1A2340;margin-bottom:14px;">${analysis}</p>
+        <p style="font-size:12px;color:#4A5270;margin-bottom:14px;">
+          <b>우수 문항:</b> ${strongItems.length}개 (${strongItems.map(x => x.q.c).join(', ') || '-'})<br>
+          <b>취약 문항:</b> ${weakItems.length}개 (${weakItems.map(x => x.q.c).join(', ') || '-'})
+        </p>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead>
+            <tr style="background:#F4F7FB;">
+              <th style="padding:8px 10px;border-bottom:1px solid #DDE2EE;text-align:left;width:60px;">문항</th>
+              <th style="padding:8px 10px;border-bottom:1px solid #DDE2EE;text-align:left;">질문</th>
+              <th style="padding:8px 10px;border-bottom:1px solid #DDE2EE;text-align:center;width:50px;">점수</th>
+              <th style="padding:8px 10px;border-bottom:1px solid #DDE2EE;text-align:center;width:60px;">평가</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  return `<div style="width:794px;padding:48px 50px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
+    <div style="border-bottom:3px solid #002555;padding-bottom:16px;margin-bottom:24px;">
+      <div style="font-size:11px;letter-spacing:3px;color:#3F8CAA;font-weight:700;margin-bottom:4px;">ESG SELF-ASSESSMENT REPORT</div>
+      <h1 style="font-size:26px;color:#002555;margin-bottom:6px;">${escapeHtml(co.name)} ESG 자가진단 결과보고서</h1>
+      <div style="font-size:12px;color:#8890A8;">진단일: ${today} · 진단 ID: ${state.diagnosisId || '-'}</div>
+    </div>
+
+    <div style="background:#F4F7FB;border-radius:8px;padding:20px 24px;margin-bottom:28px;">
+      <h2 style="font-size:14px;color:#002555;margin-bottom:12px;">기업 정보</h2>
+      <table style="width:100%;font-size:12px;">
+        <tr><td style="padding:4px 0;width:120px;color:#8890A8;">기업명</td><td style="font-weight:600;">${escapeHtml(co.name)}</td></tr>
+        ${co.biz ? `<tr><td style="padding:4px 0;color:#8890A8;">사업자번호</td><td>${escapeHtml(co.biz)}</td></tr>` : ''}
+        <tr><td style="padding:4px 0;color:#8890A8;">기업 규모</td><td>${escapeHtml(co.size)}</td></tr>
+        <tr><td style="padding:4px 0;color:#8890A8;">업종</td><td>${escapeHtml(co.industry)}</td></tr>
+      </table>
+    </div>
+
+    <div style="background:linear-gradient(135deg,#002555,#001A3D);border-radius:10px;padding:28px;color:#fff;margin-bottom:28px;">
+      <h2 style="font-size:14px;margin-bottom:8px;color:rgba(255,255,255,.7);letter-spacing:1px;">종합 진단 결과</h2>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;">
+        <div>
+          <div style="font-size:48px;font-weight:900;line-height:1;font-family:'JetBrains Mono',monospace;">${r.score}</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">/100점</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:32px;font-weight:900;line-height:1;">${r.grade}</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.85);margin-top:4px;">${r.label}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:12px;">
+          <div style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.5px;">환경 (E)</div>
+          <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.eA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
+        </div>
+        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:12px;">
+          <div style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.5px;">사회 (S)</div>
+          <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.sA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
+        </div>
+        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:12px;">
+          <div style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.5px;">거버넌스 (G)</div>
+          <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.gA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 style="font-size:18px;color:#002555;border-bottom:2px solid #002555;padding-bottom:6px;margin-bottom:14px;">진단 결과 해석</h2>
+    <p style="font-size:13px;line-height:1.8;margin-bottom:12px;color:#1A2340;">
+      ${escapeHtml(co.name)}의 ESG 종합 점수는 <b>${r.score}점</b>으로 <b>${r.grade} 등급(${r.label})</b>에 해당합니다.
+      30개 진단 문항 중 <b>${r.strong}개 문항</b>이 우수 평가(4점 이상)를 받았으며, <b>${r.weak}개 문항</b>이 취약(2점 이하)으로 식별되었습니다.
+      세 영역(환경·사회·거버넌스) 중 ${r.eA >= r.sA && r.eA >= r.gA ? '환경(E)' : r.sA >= r.gA ? '사회(S)' : '거버넌스(G)'} 영역이 상대적으로 우수하며,
+      ${r.eA <= r.sA && r.eA <= r.gA ? '환경(E)' : r.sA <= r.gA ? '사회(S)' : '거버넌스(G)'} 영역에 우선 개선이 필요합니다.
+    </p>
+    <p style="font-size:13px;line-height:1.8;margin-bottom:12px;color:#1A2340;">
+      <b>${escapeHtml(co.industry)}</b> 업종의 일반적 특성상 <b>${escapeHtml(ind.weakness)}</b>의 경향이 있습니다.
+      이러한 산업적 맥락을 고려할 때, 본 기업의 진단 결과는 ${r.score >= 60 ? '평균 이상' : '평균 수준 또는 그 이하'}로 평가되며,
+      ${ind.tip}이 권고됩니다.
+    </p>
+
+    ${areaAnalysis}
+
+    <div style="background:#EBF4F8;border-left:3px solid #3F8CAA;border-radius:5px;padding:16px 20px;margin:24px 0;">
+      <h3 style="font-size:13px;color:#002555;margin-bottom:8px;">📊 ${escapeHtml(co.industry)} 산업 특성</h3>
+      <p style="font-size:12px;color:#1A2340;line-height:1.7;margin-bottom:6px;"><b>강점:</b> ${escapeHtml(ind.strength)}</p>
+      <p style="font-size:12px;color:#1A2340;line-height:1.7;margin-bottom:6px;"><b>약점:</b> ${escapeHtml(ind.weakness)}</p>
+      <p style="font-size:12px;color:#1A2340;line-height:1.7;"><b>권고:</b> ${escapeHtml(ind.tip)}</p>
+    </div>
+
+    <div style="margin-top:32px;padding-top:14px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
+      본 보고서는 자가진단 응답을 기반으로 자동 생성되었습니다 · 작성일: ${today}<br>
+      © ESG-AACS Platform v8.0 · 한성대학교 박사학위 연구 (노은미)
+    </div>
+  </div>`;
+}
+
+function renderConsultingReportHtml(){
+  const co = state.company;
+  const r = state.result;
+  const today = new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'});
+  const md = state.consultingReport || '## 보고서 생성 실패';
+
+  // 마크다운 → HTML 변환 (간단)
+  const html = mdToHtml(md);
+
+  return `<div style="width:794px;padding:48px 50px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
+    <div style="border-bottom:3px solid #002555;padding-bottom:16px;margin-bottom:24px;">
+      <div style="font-size:11px;letter-spacing:3px;color:#3F8CAA;font-weight:700;margin-bottom:4px;">ESG CONSULTING REPORT · AGENT 2 (RAG+KG)</div>
+      <h1 style="font-size:26px;color:#002555;margin-bottom:6px;">${escapeHtml(co.name)} ESG 맞춤 컨설팅 보고서</h1>
+      <div style="font-size:12px;color:#8890A8;">작성일: ${today} · ${escapeHtml(co.industry)} · ${escapeHtml(co.size)} · 종합 ${r.score}점 (${r.grade})</div>
+    </div>
+
+    <div style="font-size:13px;line-height:1.85;color:#1A2340;">${html}</div>
+
+    <div style="margin-top:32px;padding-top:14px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
+      본 보고서는 Agentic AI (Claude Sonnet 4 + RAG + Knowledge Graph)로 자동 생성된 초안입니다.<br>
+      ${state.userType === 'consultant' ? '<b style="color:#C0392B;">⚠ 컨설턴트 활용 시 전문가 검토 후 사용 권장</b><br>' : ''}
+      출처: K-ESG 가이드라인 v2.0 · 중소기업 ESG 자가진단 실증 분석 · 중소기업중앙회 ESG 규정례<br>
+      © ESG-AACS Platform v8.0 · 작성일: ${today}
+    </div>
+  </div>`;
+}
+
+function renderEvidenceHtml(doc){
+  const co = state.company;
+  const today = new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'});
+  const html = mdToHtml(doc.content);
+
+  return `<div style="width:794px;padding:48px 50px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
+    <div style="border-bottom:3px solid #002555;padding-bottom:14px;margin-bottom:22px;">
+      <div style="font-size:10px;letter-spacing:3px;color:#3F8CAA;font-weight:700;margin-bottom:3px;">EVIDENCE DOCUMENT · ${doc.code}</div>
+      <h1 style="font-size:22px;color:#002555;margin-bottom:6px;">${escapeHtml(doc.title)}</h1>
+      <div style="font-size:11px;color:#8890A8;">기업: ${escapeHtml(co.name)} · 진단 문항: ${escapeHtml(doc.question)}</div>
+    </div>
+
+    <div style="font-size:12px;line-height:1.8;color:#1A2340;">${html}</div>
+
+    <div style="margin-top:28px;padding-top:14px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
+      본 문서는 Agentic AI가 작성한 <b>초안</b>입니다. 실제 사용 시 사실 확인 및 수정이 필요합니다.<br>
+      © ESG-AACS Platform v8.0 · 작성일: ${today}
+    </div>
+  </div>`;
+}
+
+function mdToHtml(md){
+  if (!md) return '';
+  let h = md;
+  // 표 변환
+  h = h.replace(/(\|[^\n]+\|\n\|[-:\s|]+\|\n(\|[^\n]+\|\n?)+)/g, (m) => {
+    const lines = m.trim().split('\n');
+    if (lines.length < 2) return m;
+    const headers = lines[0].split('|').filter(c => c.trim());
+    const dataRows = lines.slice(2);
+    let table = '<table style="width:100%;border-collapse:collapse;margin:14px 0;font-size:11.5px;border:1px solid #DDE2EE;">';
+    table += '<thead><tr style="background:#F4F7FB;">';
+    headers.forEach(hd => { table += `<th style="padding:8px 12px;border:1px solid #DDE2EE;text-align:left;font-size:11px;color:#4A5270;font-weight:700;">${escapeHtml(hd.trim())}</th>`; });
+    table += '</tr></thead><tbody>';
+    dataRows.forEach(row => {
+      const cells = row.split('|').filter(c => c.trim());
+      table += '<tr>';
+      cells.forEach(c => { table += `<td style="padding:7px 12px;border:1px solid #DDE2EE;vertical-align:top;">${escapeHtml(c.trim())}</td>`; });
+      table += '</tr>';
+    });
+    table += '</tbody></table>';
+    return table;
+  });
+  // 헤딩
+  h = h.replace(/^### (.*)$/gm, '<h3 style="font-size:14px;color:#002555;font-weight:800;margin:18px 0 8px 0;">$1</h3>');
+  h = h.replace(/^## (.*)$/gm, '<h2 style="font-size:17px;color:#002555;font-weight:900;margin:24px 0 10px 0;border-bottom:2px solid #3F8CAA;padding-bottom:5px;">$1</h2>');
+  h = h.replace(/^# (.*)$/gm, '<h1 style="font-size:20px;color:#002555;font-weight:900;margin:24px 0 12px 0;">$1</h1>');
+  // 굵은
+  h = h.replace(/\*\*(.+?)\*\*/g, '<b style="color:#002555;">$1</b>');
+  // 리스트
+  h = h.replace(/^- (.+)$/gm, '<li style="margin-bottom:4px;line-height:1.7;">$1</li>');
+  h = h.replace(/(<li[^>]*>.*?<\/li>\s*)+/g, m => `<ul style="margin:8px 0 12px 20px;padding-left:8px;">${m}</ul>`);
+  // 빈 줄 → 문단
+  h = h.split(/\n\n+/).map(p => {
+    p = p.trim();
+    if (!p) return '';
+    if (/^<(h\d|table|ul|ol|div|p|blockquote)/i.test(p)) return p;
+    return `<p style="margin:8px 0;line-height:1.85;">${p.replace(/\n/g, '<br>')}</p>`;
+  }).join('\n');
+  return h;
+}
+
+/* ═══ 결과 렌더링 ═══ */
+function renderResult(){
+  const r = state.result;
+  const co = state.company;
+
+  // AI 안내문
+  const warningHtml = state.userType === 'consultant'
+    ? '<b>⚠ 컨설턴트 모드</b> — 자가진단 보고서, 컨설팅 보고서, 증빙자료까지 모두 제공됩니다. 본 자료는 AI가 자동 생성한 <b>초안</b>이며, 고객사에 제공하기 전 반드시 ESG 전문가의 검토와 수정이 필요합니다.'
+    : '<b>📋 평가대상 기업 모드</b> — 자가진단·컨설팅 보고서가 제공되며, 증빙자료는 참고용 프리뷰로 제공됩니다. 모든 자료는 AI가 자동 생성한 <b>참고 초안</b>으로, 실제 ESG 평가나 인증 제출용으로 활용하기 전 전문가 검토가 권장됩니다.';
+  $('#aiWarning').className = 'ai-warning ' + (state.userType === 'consultant' ? 'consultant' : '');
+  $('#aiWarning').innerHTML = warningHtml;
+
+  // 결과 요약 카드
+  $('#rsCompany').textContent = co.name;
+  $('#rsMeta').textContent = `${co.industry} · ${co.size}${co.biz ? ' · ' + co.biz : ''}`;
+  $('#rsGrade').textContent = r.grade;
+  $('#rsGradeLabel').textContent = r.label;
+  $('#rsScore').innerHTML = `${r.score} <span class="max">/100</span>`;
+  $('#rsStrong').textContent = r.strong + ' / 30';
+  $('#rsWeak').textContent = r.weak + ' / 30';
+
+  // 영역별 카드
+  $('#areaGrid').innerHTML = AREAS.map(a => {
+    const v = a.id === 'E' ? r.eA : a.id === 'S' ? r.sA : r.gA;
+    const sc = Math.round(v * 20);
+    const g = getGrade(sc);
+    const items = state.answers.slice(a.range[0], a.range[1]);
+    const strong = items.filter(x => x >= 4).length;
+    const weak = items.filter(x => x <= 2).length;
+    return `
+      <div class="area-card ${a.id}">
+        <div class="area-card-head">
+          <div class="area-card-title">
+            <span class="area-card-icon">${a.icon}</span>
+            <div>
+              <div class="area-card-name">${a.label}</div>
+              <div class="area-card-eng">${a.eng}</div>
+            </div>
+          </div>
+          <div class="area-card-score">${sc}</div>
+        </div>
+        <div class="area-card-bar"><div class="area-card-bar-fill ${a.id}" style="width:${sc}%"></div></div>
+        <div class="area-card-stats">
+          <span><b>${v}</b> /5.0</span>
+          <span class="badge ${g.cls}">${g.grade}</span>
+          <span>강점 <b>${strong}</b> · 취약 <b>${weak}</b></span>
+        </div>
+      </div>`;
+  }).join('');
+
+  // 보고서 영역에 HTML 표시 (PDF와 동일한 레이아웃을 화면에 노출)
+  $('#reportSelf').innerHTML = renderSelfAssessmentReportHtml();
+  $('#reportConsulting').innerHTML = renderConsultingReportHtml();
+
+  // 증빙자료
+  const evHtml = state.evidenceDocs.length === 0
+    ? '<div class="card"><div style="text-align:center;color:var(--g3);padding:40px;">취약 문항이 충분치 않아 증빙자료가 생성되지 않았습니다.</div></div>'
+    : state.evidenceDocs.map((d, i) => {
+        const isPreview = state.userType === 'company';
+        return `
+          <div class="card" style="padding:0;overflow:hidden;">
+            <div style="padding:14px 20px;background:var(--navy-ll);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:11px;color:var(--accent);font-weight:700;font-family:var(--mono);">${d.code}</div>
+                <div style="font-size:14px;font-weight:700;color:var(--navy);margin-top:2px;">${escapeHtml(d.title)}</div>
+              </div>
+              ${isPreview ? '<span class="badge" style="background:var(--cond-l);color:var(--cond);">프리뷰</span>' : '<span class="badge A">전체 제공</span>'}
+            </div>
+            <div style="padding:20px;${isPreview ? 'max-height:300px;overflow:hidden;position:relative;' : ''}">
+              ${mdToHtml(d.content)}
+              ${isPreview ? '<div style="position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(to bottom,transparent,#fff);"></div>' : ''}
+            </div>
+            ${isPreview ? '<div style="padding:14px 20px;background:var(--cond-l);font-size:11px;color:var(--cond);text-align:center;">위 내용은 프리뷰입니다. 다운로드 탭에서 동의 후 PDF로 받으실 수 있습니다.</div>' : ''}
+          </div>`;
+      }).join('');
+  $('#evidenceList').innerHTML = evHtml;
+
+  // 다운로드
+  renderDownloads();
+}
+
+function renderDownloads(){
+  const items = [
+    {key:'self', icon:'📋', title:'자가진단 보고서', desc:'30문항 응답을 기반으로 한 ESG 종합 진단 결과', blob: state.pdfs.self, filename: `${state.company.name}_ESG_자가진단_보고서.pdf`},
+    {key:'consulting', icon:'📝', title:'컨설팅 보고서', desc:'AI가 작성한 영역별 진단 + 우선 개선 과제 + 실행 로드맵', blob: state.pdfs.consulting, filename: `${state.company.name}_ESG_컨설팅_보고서.pdf`}
+  ];
+
+  if (state.evidenceDocs.length > 0) {
+    items.push({
+      key: 'evidence',
+      icon: '📎',
+      title: `증빙자료 (${state.evidenceDocs.length}건)`,
+      desc: state.userType === 'consultant' ? '취약 문항별 증빙자료 PDF — 전문가 검토 후 활용' : '취약 문항별 증빙자료 PDF — 참고용',
+      multi: true
+    });
+  }
+
+  $('#downloadGrid').innerHTML = items.map(item => `
+    <div class="dl-card">
+      <div class="dl-card-icon">${item.icon}</div>
+      <div class="dl-card-title">${item.title}</div>
+      <div class="dl-card-desc">${item.desc}</div>
+      <div>
+        ${item.multi
+          ? `<span class="dl-card-status ${state.evidenceDocs.length > 0 ? 'ready' : 'failed'}">${state.evidenceDocs.length}개 준비됨</span>`
+          : `<span class="dl-card-status ${item.blob ? 'ready' : 'failed'}">${item.blob ? '준비됨' : '생성 실패'}</span>`}
+      </div>
+      ${item.multi
+        ? `<button class="btn primary sm" onclick="downloadAllEvidence()" ${state.evidenceDocs.length === 0 ? 'disabled' : ''}>모두 다운로드</button>`
+        : `<button class="btn primary sm" onclick="downloadPdf('${item.key}')" ${item.blob ? '' : 'disabled'}>다운로드</button>`}
+    </div>
+  `).join('');
+}
+
+function downloadPdf(key){
+  // 평가대상 기업이 증빙자료 받으려 할 때 동의 모달
+  if (state.userType === 'company' && key === 'evidence_single') {
+    return;
+  }
+
+  const blob = state.pdfs[key];
+  if (!blob) { toast('파일이 준비되지 않았습니다'); return; }
+  const filename = key === 'self'
+    ? `${state.company.name}_ESG_자가진단_보고서.pdf`
+    : `${state.company.name}_ESG_컨설팅_보고서.pdf`;
+  saveBlob(blob, filename);
+  toast('다운로드를 시작합니다');
+}
+
+function downloadAllEvidence(){
+  if (state.userType === 'company') {
+    showModal(
+      'AI 생성물 활용 안내',
+      `<p style="margin-bottom:12px;">증빙자료 PDF는 <b>Agentic AI가 자동 생성한 참고 초안</b>입니다.</p>
+       <ul style="margin:0 0 12px 18px;color:var(--g2);font-size:12px;line-height:1.8;">
+         <li>실제 ESG 평가·인증 제출용으로 그대로 사용하지 마세요</li>
+         <li>회사 실제 데이터로 수정·보완 후 사용하세요</li>
+         <li>법규 준수 여부는 별도 전문가 확인이 필요합니다</li>
+       </ul>
+       <p style="font-size:12px;color:var(--g2);">동의하시면 ${state.evidenceDocs.length}개의 증빙자료 PDF가 다운로드됩니다.</p>`,
+      [
+        {label: '취소', cls: ''},
+        {label: '동의 후 다운로드', cls: 'primary', action: () => doDownloadAllEvidence()}
+      ]
+    );
+  } else {
+    doDownloadAllEvidence();
+  }
+}
+
+function doDownloadAllEvidence(){
+  state.pdfs.evidence.forEach((e, i) => {
+    setTimeout(() => {
+      saveBlob(e.blob, `${state.company.name}_${e.code}_${e.title}.pdf`);
+    }, i * 300);
+  });
+  toast(`${state.evidenceDocs.length}개 파일 다운로드 시작`);
+}
+
+function saveBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 100);
+}
+
+/* ═══ 탭 ═══ */
+function setTab(tab){
+  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  $$('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.tab === tab));
+  window.scrollTo({top: $('.tabs').offsetTop - 80, behavior: 'smooth'});
+}
+
+/* ═══ 리셋 ═══ */
+function confirmReset(){
+  showModal(
+    '처음부터 다시 시작',
+    '진단 데이터가 모두 초기화됩니다. 계속하시겠습니까?<br><br><span style="color:var(--g3);font-size:11px;">※ 이미 저장된 보고서는 어드민에서 확인 가능합니다.</span>',
+    [
+      {label: '취소', cls: ''},
+      {label: '초기화', cls: 'primary', action: () => doReset()}
+    ]
+  );
+}
+
+function doReset(){
+  state.userType = null;
+  state.company = {name:'', biz:'', size:'중소기업', industry:'제조업'};
+  state.answers = new Array(30).fill(0);
+  state.diagnosisId = null;
+  state.result = null;
+  state.consultingReport = null;
+  state.evidenceDocs = [];
+  state.pdfs = {self:null, consulting:null, evidence:[]};
+  state.uploads = {self:null, consulting:null, evidence:[]};
+  $('#coName').value = '';
+  $('#coBiz').value = '';
+  $('#coSize').value = '중소기업';
+  $('#coIndustry').value = '제조업';
+  $$('.user-type-card').forEach(c => c.classList.remove('selected'));
+  $('#startBtn').disabled = true;
+  goToStep('landing');
+}
+
+/* ═══ 시작 ═══ */
+goToStep('landing');
+</script>
+</body>
+</html>
