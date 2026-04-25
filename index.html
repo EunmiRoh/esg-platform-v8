@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
 <style>
 :root{
   /* ─── 어드민 v9.0과 동일 디자인 시스템 ─── */
@@ -347,7 +348,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
         <div class="utc-desc">고객사 ESG 컨설팅에 활용할 자료를 받아보려는 ESG 전문 컨설턴트</div>
         <ul class="utc-features">
           <li>자가진단·컨설팅 보고서</li>
-          <li>증빙자료 PDF 전체 제공</li>
+          <li>증빙자료 워드(.docx) 전체 제공</li>
           <li>전문가 검토 후 활용 권장</li>
         </ul>
       </button>
@@ -378,7 +379,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
 
     <div class="form-row">
       <label class="form-label">기업명 <span class="req">*</span></label>
-      <input type="text" id="coName" class="input" placeholder="예) 한성테크">
+      <input type="text" id="coName" class="input" placeholder="예) 가나다 주식회사">
     </div>
     <div class="form-row">
       <label class="form-label">사업자등록번호 (선택)</label>
@@ -443,7 +444,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
       <div class="analyzing-stage" data-stage="predict"><span class="dot"></span><span>Stage 2 · 등급 예측 (GBM + SHAP)</span></div>
       <div class="analyzing-stage" data-stage="consulting"><span class="dot"></span><span>Stage 3 · 컨설팅 보고서 생성 (RAG + KG)</span></div>
       <div class="analyzing-stage" data-stage="evidence"><span class="dot"></span><span>Stage 3-E · 증빙자료 자동 작성</span></div>
-      <div class="analyzing-stage" data-stage="pdf"><span class="dot"></span><span>PDF 변환 및 저장</span></div>
+      <div class="analyzing-stage" data-stage="pdf"><span class="dot"></span><span>PDF·워드 변환 및 저장</span></div>
     </div>
   </div>
 </div>
@@ -1078,54 +1079,153 @@ async function generateEvidenceDocs(){
   }
 }
 
-/* ═══ PDF 생성 (jsPDF + html2canvas) ═══ */
+/* ═══ PDF 생성 (jsPDF + html2canvas, 섹션별 분할 캡처) ═══
+   v8.1 개선: 페이지 경계에서 표/문단 중간이 잘리는 문제 해결
+   - 보고서 HTML을 .pdf-section 단위로 분리
+   - 각 섹션을 독립적으로 캡처하여 페이지에 배치
+   - 한 섹션이 한 페이지를 넘기면 자연스럽게 다음 페이지로 이어짐
+*/
 async function htmlToPdf(htmlString, filename){
   const renderArea = $('#pdfRenderArea');
   renderArea.innerHTML = htmlString;
   const target = renderArea.firstElementChild;
 
-  // html2canvas로 캔버스 생성
-  const canvas = await html2canvas(target, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: '#ffffff',
-    logging: false
-  });
+  // 폰트/이미지 로딩 대기 (한글 안정성)
+  await new Promise(r => setTimeout(r, 250));
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch(e) {}
+  }
 
-  // jsPDF로 PDF 생성 (A4 세로)
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = pdf.internal.pageSize.getHeight();
+  const pdfWidth = pdf.internal.pageSize.getWidth();   // 210mm
+  const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
+  const margin = 10;                                    // 페이지 여백 (상하좌우 mm)
+  const usableWidth = pdfWidth - margin * 2;
+  const usableHeight = pdfHeight - margin * 2;
 
-  const imgWidth = pdfWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+  // 섹션 단위로 캡처 (없으면 전체를 하나의 섹션으로)
+  let sections = target.querySelectorAll('.pdf-section');
+  if (!sections.length) sections = [target];
 
-  let heightLeft = imgHeight;
-  let position = 0;
+  let cursorY = margin;       // 현재 페이지에서 다음 콘텐츠가 들어갈 Y
+  let isFirstPage = true;
 
-  pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-  heightLeft -= pdfHeight;
+  for (const sec of sections) {
+    // 각 섹션 캡처
+    const canvas = await html2canvas(sec, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const imgWidthMm = usableWidth;
+    const imgHeightMm = (canvas.height * imgWidthMm) / canvas.width;
 
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pdfHeight;
+    if (imgHeightMm <= usableHeight) {
+      // 섹션이 1페이지 이내 — 현재 페이지에 들어갈 수 있는지 검사
+      if (!isFirstPage && cursorY + imgHeightMm > pdfHeight - margin) {
+        pdf.addPage();
+        cursorY = margin;
+      }
+      pdf.addImage(imgData, 'JPEG', margin, cursorY, imgWidthMm, imgHeightMm);
+      cursorY += imgHeightMm + 4;  // 섹션 사이 약간 간격
+    } else {
+      // 섹션이 한 페이지보다 길면 — 페이지 경계에서 잘라서 여러 페이지에 분할
+      // (긴 표나 본문을 위한 안전장치)
+      if (!isFirstPage && cursorY > margin) {
+        pdf.addPage();
+        cursorY = margin;
+      }
+      let remaining = imgHeightMm;
+      let yOffset = 0;
+      while (remaining > 0) {
+        const sliceHeight = Math.min(remaining, usableHeight);
+        // 부분 슬라이스를 캔버스에서 잘라서 추가
+        const sliceCanvas = document.createElement('canvas');
+        const sourceY = (yOffset / imgHeightMm) * canvas.height;
+        const sourceH = (sliceHeight / imgHeightMm) * canvas.height;
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sourceH;
+        const ctx = sliceCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceH, 0, 0, canvas.width, sourceH);
+        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+        pdf.addImage(sliceData, 'JPEG', margin, margin, imgWidthMm, sliceHeight);
+
+        remaining -= sliceHeight;
+        yOffset += sliceHeight;
+        if (remaining > 0) {
+          pdf.addPage();
+        }
+      }
+      cursorY = margin + (imgHeightMm % usableHeight || usableHeight) + 4;
+      if (cursorY > pdfHeight - margin) {
+        pdf.addPage();
+        cursorY = margin;
+      }
+    }
+    isFirstPage = false;
   }
 
   renderArea.innerHTML = '';
   return pdf.output('blob');
 }
 
-async function uploadPdfToStorage(blob, path){
+/* ═══ 워드(.docx) 생성 - 증빙자료 전용 ═══
+   html-docx-js로 HTML → docx 변환
+   PDF의 페이지 잘림/표 깨짐 이슈를 워드에서는 자연 해결
+   (워드가 자체적으로 표/문단을 페이지에 알맞게 흘려보냄)
+*/
+async function htmlToDocx(htmlString, filename){
+  // html-docx-js는 완전한 HTML 문서 형태가 필요함 (head + body)
+  const fullHtml = `
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+      <meta charset="UTF-8">
+      <title>${filename}</title>
+      <style>
+        body { font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif; font-size: 11pt; color: #1A2340; line-height: 1.7; }
+        h1 { font-size: 18pt; color: #002555; border-bottom: 2pt solid #002555; padding-bottom: 4pt; margin-bottom: 12pt; }
+        h2 { font-size: 14pt; color: #002555; border-bottom: 1pt solid #3F8CAA; padding-bottom: 3pt; margin-top: 18pt; margin-bottom: 8pt; }
+        h3 { font-size: 12pt; color: #002555; margin-top: 14pt; margin-bottom: 6pt; }
+        h4 { font-size: 11pt; color: #002555; margin-top: 10pt; margin-bottom: 4pt; }
+        p { margin: 6pt 0; line-height: 1.7; }
+        table { width: 100%; border-collapse: collapse; margin: 10pt 0; font-size: 10.5pt; }
+        th, td { border: 1pt solid #999; padding: 6pt 8pt; vertical-align: top; }
+        th { background-color: #F4F7FB; font-weight: bold; color: #4A5270; }
+        ul, ol { margin: 6pt 0 6pt 18pt; }
+        li { margin-bottom: 3pt; line-height: 1.7; }
+        b, strong { color: #002555; font-weight: bold; }
+        .header-meta { font-size: 9pt; color: #8890A8; margin-bottom: 12pt; }
+        .footer { margin-top: 18pt; padding-top: 8pt; border-top: 1pt solid #DDE2EE; font-size: 9pt; color: #8890A8; text-align: center; }
+        .doc-tag { font-size: 9pt; letter-spacing: 2pt; color: #3F8CAA; font-weight: bold; }
+        /* 서명란 표는 페이지 분리 방지 */
+        .sign-table { page-break-inside: avoid; }
+      </style>
+    </head>
+    <body>${htmlString}</body>
+    </html>
+  `;
+
+  // html-docx-js 로 변환
+  const docxBlob = window.htmlDocx.asBlob(fullHtml, {
+    orientation: 'portrait',
+    margins: { top: 720, right: 720, bottom: 720, left: 720 }  // 0.5인치 = 720 twips
+  });
+  return docxBlob;
+}
+
+async function uploadFileToStorage(blob, path, mimeType){
   if (!sb) return null;
   try {
     const { data, error } = await sb.storage
       .from('esg-reports')
       .upload(path, blob, {
-        contentType: 'application/pdf',
+        contentType: mimeType || 'application/pdf',
         upsert: true
       });
     if (error) throw error;
@@ -1135,6 +1235,8 @@ async function uploadPdfToStorage(blob, path){
     return null;
   }
 }
+// 호환용 별칭 (기존 코드가 호출해도 동작)
+const uploadPdfToStorage = uploadFileToStorage;
 
 async function generateAllPdfs(){
   const did = state.diagnosisId || ('temp-' + Date.now());
@@ -1149,17 +1251,23 @@ async function generateAllPdfs(){
   state.pdfs.consulting = await htmlToPdf(consHtml, `${state.company.name}_컨설팅_보고서.pdf`);
   state.uploads.consulting = await uploadPdfToStorage(state.pdfs.consulting, `${did}/consulting.pdf`);
 
-  // 3. 증빙자료 PDF (각각)
+  // 3. 증빙자료 워드(.docx) — 편집·서명 가능하도록 워드 형식으로 생성
+  //    (PDF는 캔버스 변환 시 표/서명란 깨짐 이슈가 있어 워드가 더 안정적)
   state.uploads.evidence = [];
   for (const doc of state.evidenceDocs) {
     const html = renderEvidenceHtml(doc);
-    const blob = await htmlToPdf(html, `${doc.code}.pdf`);
-    state.pdfs.evidence.push({code: doc.code, title: doc.title, blob});
-    const path = await uploadPdfToStorage(blob, `${did}/evidence/${doc.code}.pdf`);
-    state.uploads.evidence.push({code: doc.code, title: doc.title, path});
+    const blob = await htmlToDocx(html, `${doc.code}.docx`);
+    state.pdfs.evidence.push({code: doc.code, title: doc.title, blob, ext: 'docx'});
+    const path = await uploadFileToStorage(
+      blob,
+      `${did}/evidence/${doc.code}.docx`,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+    state.uploads.evidence.push({code: doc.code, title: doc.title, path, ext: 'docx'});
   }
 
-  // 4. Supabase에 PDF 경로 업데이트
+  // 4. Supabase에 파일 경로 업데이트
+  //    evidence_pdfs 컬럼은 하위 호환을 위해 그대로 사용 (이름은 PDF지만 .docx 경로도 저장)
   if (sb && state.diagnosisId) {
     try {
       await sb.from('diagnosis_results').update({
@@ -1168,7 +1276,7 @@ async function generateAllPdfs(){
         evidence_pdfs: state.uploads.evidence
       }).eq('id', state.diagnosisId);
     } catch (e) {
-      console.warn('PDF 경로 업데이트 실패:', e);
+      console.warn('파일 경로 업데이트 실패:', e);
     }
   }
 }
@@ -1180,7 +1288,7 @@ function renderSelfAssessmentReportHtml(){
   const ind = INDUSTRY_INSIGHT[co.industry] || INDUSTRY_INSIGHT['제조업'];
   const today = new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'});
 
-  // 영역별 분석
+  // 영역별 분석 — v8.1: 서술 강화 + 5점 차원 평가 + 구체 권고
   const areaAnalysis = AREAS.map(a => {
     const v = a.id === 'E' ? r.eA : a.id === 'S' ? r.sA : r.gA;
     const sc = Math.round(v * 20);
@@ -1191,11 +1299,21 @@ function renderSelfAssessmentReportHtml(){
     });
     const strongItems = items.filter(x => x.sv >= 4);
     const weakItems = items.filter(x => x.sv <= 2);
+    const avgItems = items.filter(x => x.sv === 3);
 
+    // 영역별 진단 서술 (v8.1 보강 — 단순 "수준 안내"를 넘어 구체적 의미 해석)
     let analysis = '';
-    if (sc >= 70) analysis = `${a.label} 영역은 ${g.label} 수준으로 ${co.industry} 업종 내에서 양호한 위치에 있습니다. 다만 일부 세부 항목에서 추가 개선 여지가 있어, 현재 수준을 유지하면서 약점 영역을 보완하는 전략이 효과적입니다.`;
-    else if (sc >= 50) analysis = `${a.label} 영역은 ${g.label} 수준으로 기본 체계는 갖추어져 있으나 보완이 필요한 상태입니다. 특히 취약 문항들을 중심으로 단계적 개선이 요구되며, 향후 12개월 내 시스템적 보강을 통해 한 단계 상위 등급으로 진입할 수 있습니다.`;
-    else analysis = `${a.label} 영역은 ${g.label} 수준으로 즉각적인 개선 조치가 필요한 상태입니다. ${weakItems.length}개의 취약 문항이 식별되었으며, 관련 법규 위반 리스크도 존재할 수 있어 우선적인 대응이 권고됩니다.`;
+    let actionGuide = '';
+    if (sc >= 70) {
+      analysis = `${a.label}(${a.eng}) 영역은 <b>${g.label} 수준</b>으로 ${escapeHtml(co.industry)} 업종 내에서 양호한 위치에 있습니다. 30개 진단 문항 중 본 영역 ${items.length}개 항목에서 평균 ${v}점을 획득하였으며, 이는 ${a.label} 관련 기본 체계와 운영 절차가 안정적으로 작동하고 있음을 의미합니다. 특히 ${strongItems.length}개 항목에서 우수 평가를 받아 동종 업계 평균을 상회하는 강점을 보유하고 있습니다.`;
+      actionGuide = `현재 수준을 유지하면서 취약 항목 ${weakItems.length}개를 보완하는 전략이 효과적입니다. 또한 우수 항목의 운영 노하우를 다른 영역으로 확산시켜 전사적 ESG 성숙도를 끌어올리는 기회로 활용할 수 있습니다.`;
+    } else if (sc >= 50) {
+      analysis = `${a.label}(${a.eng}) 영역은 <b>${g.label} 수준</b>으로 기본 체계는 갖추어져 있으나 보완이 필요한 상태입니다. 본 영역 ${items.length}개 항목에서 평균 ${v}점을 기록하였으며, ${strongItems.length}개 우수 항목과 ${weakItems.length}개 취약 항목, ${avgItems.length}개 보통 항목으로 분포되어 있습니다. 이는 ${a.label} 관리에 대한 기본 인식과 일부 절차는 마련되어 있으나, 일관된 시스템과 모니터링 체계가 부족한 단계임을 시사합니다.`;
+      actionGuide = `취약 항목들을 우선 개선 과제로 선정하여 향후 12개월 내 단계적 보강을 수행하면 한 단계 상위 등급(B+ 이상)으로 진입할 수 있습니다. 특히 문서화·정기 점검·교육 체계를 정비하는 것이 효과적입니다.`;
+    } else {
+      analysis = `${a.label}(${a.eng}) 영역은 <b>${g.label} 수준</b>으로 즉각적인 개선 조치가 필요한 상태입니다. 본 영역 ${items.length}개 항목 중 ${weakItems.length}개가 취약 평가를 받아 전체의 ${Math.round(weakItems.length/items.length*100)}%를 차지합니다. 이는 ${a.label} 관련 정책·절차·실행 체계의 상당 부분이 미비하며, 관련 법규 준수 측면에서도 리스크가 존재할 수 있음을 의미합니다.`;
+      actionGuide = `우선 시급도가 높은 법규 준수 항목부터 정비하고, 3개월 단위로 단기 목표를 수립하여 기본 체계를 빠르게 갖추는 것이 시급합니다. 외부 전문가 자문이나 정부 ESG 지원사업 활용을 적극 검토하시기 바랍니다.`;
+    }
 
     const tableRows = items.map(x => `
       <tr>
@@ -1206,15 +1324,20 @@ function renderSelfAssessmentReportHtml(){
       </tr>`).join('');
 
     return `
-      <div style="margin-bottom:32px;page-break-inside:avoid;">
+      <div class="pdf-section" style="margin-bottom:28px;">
         <h2 style="font-size:18px;color:#002555;border-bottom:2px solid ${a.id==='E'?'#15803d':a.id==='S'?'#2563EB':'#7c3aed'};padding-bottom:6px;margin-bottom:12px;">
           ${a.icon} ${a.label} (${a.eng}) — ${sc}점 (${g.grade})
         </h2>
-        <p style="font-size:13px;line-height:1.8;color:#1A2340;margin-bottom:14px;">${analysis}</p>
-        <p style="font-size:12px;color:#4A5270;margin-bottom:14px;">
-          <b>우수 문항:</b> ${strongItems.length}개 (${strongItems.map(x => x.q.c).join(', ') || '-'})<br>
-          <b>취약 문항:</b> ${weakItems.length}개 (${weakItems.map(x => x.q.c).join(', ') || '-'})
+        <p style="font-size:13px;line-height:1.85;color:#1A2340;margin-bottom:12px;">${analysis}</p>
+        <p style="font-size:13px;line-height:1.85;color:#1A2340;margin-bottom:14px;"><b style="color:#002555;">📌 권고 방향:</b> ${actionGuide}</p>
+        <p style="font-size:12px;color:#4A5270;margin-bottom:14px;background:#F4F7FB;padding:10px 14px;border-radius:6px;">
+          <b>우수 문항:</b> ${strongItems.length}개 ${strongItems.length ? `(${strongItems.map(x => x.q.c).join(', ')})` : ''}<br>
+          <b>보통 문항:</b> ${avgItems.length}개<br>
+          <b>취약 문항:</b> ${weakItems.length}개 ${weakItems.length ? `(${weakItems.map(x => x.q.c).join(', ')})` : ''}
         </p>
+      </div>
+      <div class="pdf-section" style="margin-bottom:28px;">
+        <h3 style="font-size:14px;color:#002555;margin-bottom:8px;">${a.label} 영역 문항별 결과</h3>
         <table style="width:100%;border-collapse:collapse;font-size:11px;">
           <thead>
             <tr style="background:#F4F7FB;">
@@ -1229,15 +1352,24 @@ function renderSelfAssessmentReportHtml(){
       </div>`;
   }).join('');
 
-  return `<div style="width:794px;padding:48px 50px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
-    <div style="border-bottom:3px solid #002555;padding-bottom:16px;margin-bottom:24px;">
+  // 종합 진단 해석 보강 (v8.1)
+  const bestArea = r.eA >= r.sA && r.eA >= r.gA ? '환경(E)' : r.sA >= r.gA ? '사회(S)' : '거버넌스(G)';
+  const worstArea = r.eA <= r.sA && r.eA <= r.gA ? '환경(E)' : r.sA <= r.gA ? '사회(S)' : '거버넌스(G)';
+  const overallTone = r.score >= 70
+    ? `현재 수준은 동종 업계 평균을 상회하는 양호한 상태로 평가됩니다. ESG 경영의 기본 체계가 안정적으로 구축되어 있으며, 지속적인 고도화를 통해 ESG 선도 기업으로 도약할 수 있는 기반을 갖추고 있습니다.`
+    : r.score >= 50
+    ? `현재 수준은 ESG 경영 도입기에 해당하며, 기본 체계는 마련되어 있으나 시스템적 운영과 모니터링이 부족한 상태입니다. 향후 6~12개월 내 집중적인 개선 활동을 통해 한 단계 상위 등급으로 진입할 수 있습니다.`
+    : `현재 수준은 ESG 경영의 초기 단계로, 기본 체계 구축이 시급한 상태입니다. 법규 준수 리스크와 이해관계자 요구 미충족 가능성이 존재하므로, 외부 자문과 정부 지원사업 활용을 포함한 전사적 대응이 권고됩니다.`;
+
+  return `<div style="width:794px;padding:42px 48px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
+    <div class="pdf-section" style="border-bottom:3px solid #002555;padding-bottom:14px;margin-bottom:22px;">
       <div style="font-size:11px;letter-spacing:3px;color:#3F8CAA;font-weight:700;margin-bottom:4px;">ESG SELF-ASSESSMENT REPORT</div>
-      <h1 style="font-size:26px;color:#002555;margin-bottom:6px;">${escapeHtml(co.name)} ESG 자가진단 결과보고서</h1>
+      <h1 style="font-size:24px;color:#002555;margin-bottom:6px;">${escapeHtml(co.name)} ESG 자가진단 결과보고서</h1>
       <div style="font-size:12px;color:#8890A8;">진단일: ${today} · 진단 ID: ${state.diagnosisId || '-'}</div>
     </div>
 
-    <div style="background:#F4F7FB;border-radius:8px;padding:20px 24px;margin-bottom:28px;">
-      <h2 style="font-size:14px;color:#002555;margin-bottom:12px;">기업 정보</h2>
+    <div class="pdf-section" style="background:#F4F7FB;border-radius:8px;padding:18px 22px;margin-bottom:22px;">
+      <h2 style="font-size:14px;color:#002555;margin-bottom:10px;">기업 정보</h2>
       <table style="width:100%;font-size:12px;">
         <tr><td style="padding:4px 0;width:120px;color:#8890A8;">기업명</td><td style="font-weight:600;">${escapeHtml(co.name)}</td></tr>
         ${co.biz ? `<tr><td style="padding:4px 0;color:#8890A8;">사업자번호</td><td>${escapeHtml(co.biz)}</td></tr>` : ''}
@@ -1246,59 +1378,63 @@ function renderSelfAssessmentReportHtml(){
       </table>
     </div>
 
-    <div style="background:linear-gradient(135deg,#002555,#001A3D);border-radius:10px;padding:28px;color:#fff;margin-bottom:28px;">
+    <div class="pdf-section" style="background:linear-gradient(135deg,#002555,#001A3D);border-radius:10px;padding:24px;color:#fff;margin-bottom:24px;">
       <h2 style="font-size:14px;margin-bottom:8px;color:rgba(255,255,255,.7);letter-spacing:1px;">종합 진단 결과</h2>
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;">
         <div>
-          <div style="font-size:48px;font-weight:900;line-height:1;font-family:'JetBrains Mono',monospace;">${r.score}</div>
+          <div style="font-size:44px;font-weight:900;line-height:1;font-family:'JetBrains Mono',monospace;">${r.score}</div>
           <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">/100점</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:32px;font-weight:900;line-height:1;">${r.grade}</div>
+          <div style="font-size:30px;font-weight:900;line-height:1;">${r.grade}</div>
           <div style="font-size:13px;color:rgba(255,255,255,.85);margin-top:4px;">${r.label}</div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:12px;">
+        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:10px;">
           <div style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.5px;">환경 (E)</div>
-          <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.eA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
+          <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.eA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
         </div>
-        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:12px;">
+        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:10px;">
           <div style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.5px;">사회 (S)</div>
-          <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.sA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
+          <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.sA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
         </div>
-        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:12px;">
+        <div style="background:rgba(255,255,255,.08);border-radius:6px;padding:10px;">
           <div style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600;letter-spacing:.5px;">거버넌스 (G)</div>
-          <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.gA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
+          <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">${r.gA} <span style="font-size:11px;color:rgba(255,255,255,.5);">/5</span></div>
         </div>
       </div>
     </div>
 
-    <h2 style="font-size:18px;color:#002555;border-bottom:2px solid #002555;padding-bottom:6px;margin-bottom:14px;">진단 결과 해석</h2>
-    <p style="font-size:13px;line-height:1.8;margin-bottom:12px;color:#1A2340;">
-      ${escapeHtml(co.name)}의 ESG 종합 점수는 <b>${r.score}점</b>으로 <b>${r.grade} 등급(${r.label})</b>에 해당합니다.
-      30개 진단 문항 중 <b>${r.strong}개 문항</b>이 우수 평가(4점 이상)를 받았으며, <b>${r.weak}개 문항</b>이 취약(2점 이하)으로 식별되었습니다.
-      세 영역(환경·사회·거버넌스) 중 ${r.eA >= r.sA && r.eA >= r.gA ? '환경(E)' : r.sA >= r.gA ? '사회(S)' : '거버넌스(G)'} 영역이 상대적으로 우수하며,
-      ${r.eA <= r.sA && r.eA <= r.gA ? '환경(E)' : r.sA <= r.gA ? '사회(S)' : '거버넌스(G)'} 영역에 우선 개선이 필요합니다.
-    </p>
-    <p style="font-size:13px;line-height:1.8;margin-bottom:12px;color:#1A2340;">
-      <b>${escapeHtml(co.industry)}</b> 업종의 일반적 특성상 <b>${escapeHtml(ind.weakness)}</b>의 경향이 있습니다.
-      이러한 산업적 맥락을 고려할 때, 본 기업의 진단 결과는 ${r.score >= 60 ? '평균 이상' : '평균 수준 또는 그 이하'}로 평가되며,
-      ${ind.tip}이 권고됩니다.
-    </p>
+    <div class="pdf-section" style="margin-bottom:22px;">
+      <h2 style="font-size:18px;color:#002555;border-bottom:2px solid #002555;padding-bottom:6px;margin-bottom:12px;">진단 결과 해석</h2>
+      <p style="font-size:13px;line-height:1.85;margin-bottom:10px;color:#1A2340;">
+        ${escapeHtml(co.name)}의 ESG 종합 점수는 <b>${r.score}점</b>으로 <b>${r.grade} 등급(${r.label})</b>에 해당합니다.
+        30개 진단 문항 중 <b>${r.strong}개 문항</b>이 우수 평가(4점 이상)를 받았으며, <b>${r.weak}개 문항</b>이 취약(2점 이하)으로 식별되었습니다.
+        세 영역(환경·사회·거버넌스) 중 <b>${bestArea}</b> 영역이 상대적으로 우수하며, <b>${worstArea}</b> 영역에 우선 개선이 필요합니다.
+      </p>
+      <p style="font-size:13px;line-height:1.85;margin-bottom:10px;color:#1A2340;">
+        ${overallTone}
+      </p>
+      <p style="font-size:13px;line-height:1.85;margin-bottom:10px;color:#1A2340;">
+        <b>${escapeHtml(co.industry)}</b> 업종의 일반적 특성상 <b>${escapeHtml(ind.weakness)}</b>의 경향이 있습니다.
+        이러한 산업적 맥락을 고려할 때, 본 기업의 진단 결과는 ${r.score >= 60 ? '평균 이상' : '평균 수준 또는 그 이하'}로 평가되며,
+        ${ind.tip}이 권고됩니다. 또한 ${escapeHtml(co.size)} 규모 기업의 경우, 한정된 자원을 효율적으로 활용하기 위해 <b>가장 시급한 ${worstArea} 영역의 취약 항목</b>부터 단계적으로 개선하는 접근이 효과적입니다.
+      </p>
+    </div>
 
-    ${areaAnalysis}
-
-    <div style="background:#EBF4F8;border-left:3px solid #3F8CAA;border-radius:5px;padding:16px 20px;margin:24px 0;">
+    <div class="pdf-section" style="background:#EBF4F8;border-left:3px solid #3F8CAA;border-radius:5px;padding:14px 18px;margin-bottom:22px;">
       <h3 style="font-size:13px;color:#002555;margin-bottom:8px;">📊 ${escapeHtml(co.industry)} 산업 특성</h3>
       <p style="font-size:12px;color:#1A2340;line-height:1.7;margin-bottom:6px;"><b>강점:</b> ${escapeHtml(ind.strength)}</p>
       <p style="font-size:12px;color:#1A2340;line-height:1.7;margin-bottom:6px;"><b>약점:</b> ${escapeHtml(ind.weakness)}</p>
       <p style="font-size:12px;color:#1A2340;line-height:1.7;"><b>권고:</b> ${escapeHtml(ind.tip)}</p>
     </div>
 
-    <div style="margin-top:32px;padding-top:14px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
+    ${areaAnalysis}
+
+    <div class="pdf-section" style="margin-top:24px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 자가진단 응답을 기반으로 자동 생성되었습니다 · 작성일: ${today}<br>
-      © ESG-AACS Platform v8.0 · 한성대학교 박사학위 연구 (노은미)
+      © ESG-AACS Platform v8.0
     </div>
   </div>`;
 }
@@ -1310,18 +1446,22 @@ function renderConsultingReportHtml(){
   const md = state.consultingReport || '## 보고서 생성 실패';
 
   // 마크다운 → HTML 변환 (간단)
-  const html = mdToHtml(md);
+  let html = mdToHtml(md);
+  // h2 단위로 자동 섹션화 (PDF 페이지 잘림 방지)
+  html = html.replace(/<h2/g, '</div><div class="pdf-section" style="margin-bottom:18px;"><h2');
+  if (html.startsWith('</div>')) html = html.substring(6); // 첫 </div> 제거
+  html = '<div class="pdf-section" style="margin-bottom:18px;">' + html + '</div>';
 
-  return `<div style="width:794px;padding:48px 50px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
-    <div style="border-bottom:3px solid #002555;padding-bottom:16px;margin-bottom:24px;">
+  return `<div style="width:794px;padding:42px 48px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
+    <div class="pdf-section" style="border-bottom:3px solid #002555;padding-bottom:14px;margin-bottom:22px;">
       <div style="font-size:11px;letter-spacing:3px;color:#3F8CAA;font-weight:700;margin-bottom:4px;">ESG CONSULTING REPORT · AGENT 2 (RAG+KG)</div>
-      <h1 style="font-size:26px;color:#002555;margin-bottom:6px;">${escapeHtml(co.name)} ESG 맞춤 컨설팅 보고서</h1>
+      <h1 style="font-size:24px;color:#002555;margin-bottom:6px;">${escapeHtml(co.name)} ESG 맞춤 컨설팅 보고서</h1>
       <div style="font-size:12px;color:#8890A8;">작성일: ${today} · ${escapeHtml(co.industry)} · ${escapeHtml(co.size)} · 종합 ${r.score}점 (${r.grade})</div>
     </div>
 
     <div style="font-size:13px;line-height:1.85;color:#1A2340;">${html}</div>
 
-    <div style="margin-top:32px;padding-top:14px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
+    <div class="pdf-section" style="margin-top:28px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 Agentic AI (Claude Sonnet 4 + RAG + Knowledge Graph)로 자동 생성된 초안입니다.<br>
       ${state.userType === 'consultant' ? '<b style="color:#C0392B;">⚠ 컨설턴트 활용 시 전문가 검토 후 사용 권장</b><br>' : ''}
       출처: K-ESG 가이드라인 v2.0 · 중소기업 ESG 자가진단 실증 분석 · 중소기업중앙회 ESG 규정례<br>
@@ -1333,18 +1473,23 @@ function renderConsultingReportHtml(){
 function renderEvidenceHtml(doc){
   const co = state.company;
   const today = new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'});
-  const html = mdToHtml(doc.content);
+  // 서명란 표가 있으면 page-break-inside:avoid 클래스를 추가하기 위해 마킹
+  // mdToHtml에서 "서명" 또는 "승인" 표는 sign-table 클래스로 처리
+  let body = mdToHtml(doc.content);
+  // 서명/승인 표 자동 인식 → sign-table 클래스 추가 (워드에서 분리 방지)
+  body = body.replace(
+    /<table([^>]*)>(\s*<thead><tr[^>]*><th[^>]*>구분<\/th>[\s\S]*?서명[\s\S]*?<\/table>)/g,
+    '<table$1 class="sign-table">$2'
+  );
 
-  return `<div style="width:794px;padding:48px 50px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
-    <div style="border-bottom:3px solid #002555;padding-bottom:14px;margin-bottom:22px;">
-      <div style="font-size:10px;letter-spacing:3px;color:#3F8CAA;font-weight:700;margin-bottom:3px;">EVIDENCE DOCUMENT · ${doc.code}</div>
-      <h1 style="font-size:22px;color:#002555;margin-bottom:6px;">${escapeHtml(doc.title)}</h1>
-      <div style="font-size:11px;color:#8890A8;">기업: ${escapeHtml(co.name)} · 진단 문항: ${escapeHtml(doc.question)}</div>
+  return `<div>
+    <div class="doc-tag">EVIDENCE DOCUMENT · ${doc.code}</div>
+    <h1>${escapeHtml(doc.title)}</h1>
+    <div class="header-meta">
+      기업: ${escapeHtml(co.name)} · 진단 문항: ${escapeHtml(doc.question)}
     </div>
-
-    <div style="font-size:12px;line-height:1.8;color:#1A2340;">${html}</div>
-
-    <div style="margin-top:28px;padding-top:14px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
+    ${body}
+    <div class="footer">
       본 문서는 Agentic AI가 작성한 <b>초안</b>입니다. 실제 사용 시 사실 확인 및 수정이 필요합니다.<br>
       © ESG-AACS Platform v8.0 · 작성일: ${today}
     </div>
@@ -1464,7 +1609,7 @@ function renderResult(){
               ${mdToHtml(d.content)}
               ${isPreview ? '<div style="position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(to bottom,transparent,#fff);"></div>' : ''}
             </div>
-            ${isPreview ? '<div style="padding:14px 20px;background:var(--cond-l);font-size:11px;color:var(--cond);text-align:center;">위 내용은 프리뷰입니다. 다운로드 탭에서 동의 후 PDF로 받으실 수 있습니다.</div>' : ''}
+            ${isPreview ? '<div style="padding:14px 20px;background:var(--cond-l);font-size:11px;color:var(--cond);text-align:center;">위 내용은 프리뷰입니다. 다운로드 탭에서 동의 후 워드(.docx) 파일로 받으실 수 있습니다.</div>' : ''}
           </div>`;
       }).join('');
   $('#evidenceList').innerHTML = evHtml;
@@ -1484,7 +1629,7 @@ function renderDownloads(){
       key: 'evidence',
       icon: '📎',
       title: `증빙자료 (${state.evidenceDocs.length}건)`,
-      desc: state.userType === 'consultant' ? '취약 문항별 증빙자료 PDF — 전문가 검토 후 활용' : '취약 문항별 증빙자료 PDF — 참고용',
+      desc: state.userType === 'consultant' ? '취약 문항별 증빙자료 워드(.docx) — 전문가 검토 후 활용' : '취약 문항별 증빙자료 워드(.docx) — 참고용',
       multi: true
     });
   }
@@ -1525,13 +1670,13 @@ function downloadAllEvidence(){
   if (state.userType === 'company') {
     showModal(
       'AI 생성물 활용 안내',
-      `<p style="margin-bottom:12px;">증빙자료 PDF는 <b>Agentic AI가 자동 생성한 참고 초안</b>입니다.</p>
+      `<p style="margin-bottom:12px;">증빙자료(워드 문서)는 <b>Agentic AI가 자동 생성한 참고 초안</b>입니다.</p>
        <ul style="margin:0 0 12px 18px;color:var(--g2);font-size:12px;line-height:1.8;">
          <li>실제 ESG 평가·인증 제출용으로 그대로 사용하지 마세요</li>
-         <li>회사 실제 데이터로 수정·보완 후 사용하세요</li>
+         <li>회사 실제 데이터로 수정·보완 후 서명·날인하여 사용하세요</li>
          <li>법규 준수 여부는 별도 전문가 확인이 필요합니다</li>
        </ul>
-       <p style="font-size:12px;color:var(--g2);">동의하시면 ${state.evidenceDocs.length}개의 증빙자료 PDF가 다운로드됩니다.</p>`,
+       <p style="font-size:12px;color:var(--g2);">동의하시면 ${state.evidenceDocs.length}개의 증빙자료 워드 파일(.docx)이 다운로드됩니다.</p>`,
       [
         {label: '취소', cls: ''},
         {label: '동의 후 다운로드', cls: 'primary', action: () => doDownloadAllEvidence()}
@@ -1545,10 +1690,11 @@ function downloadAllEvidence(){
 function doDownloadAllEvidence(){
   state.pdfs.evidence.forEach((e, i) => {
     setTimeout(() => {
-      saveBlob(e.blob, `${state.company.name}_${e.code}_${e.title}.pdf`);
+      const ext = e.ext || 'docx';
+      saveBlob(e.blob, `${state.company.name}_${e.code}_${e.title}.${ext}`);
     }, i * 300);
   });
-  toast(`${state.evidenceDocs.length}개 파일 다운로드 시작`);
+  toast(`${state.evidenceDocs.length}개 워드 파일 다운로드 시작`);
 }
 
 function saveBlob(blob, filename){
@@ -1607,3 +1753,4 @@ goToStep('landing');
 </script>
 </body>
 </html>
+
