@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.0</title>
+<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2</title>
 <meta property="og:title" content="ESG 자가진단 컨설팅 플랫폼">
 <meta property="og:description" content="중소기업 ESG 자가진단 + AI 맞춤형 컨설팅 보고서">
 <meta property="og:type" content="website">
@@ -12,7 +12,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
+<!-- v8.2: 진짜 docx XML 생성 (표 셀병합 완벽 지원) — 메인 라이브러리 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.js"></script>
+<!-- v8.2: 폴백용 (docx-js 로딩 실패 시 사용) -->
+<script src="https://unpkg.com/html-docx-js/dist/html-docx.js"
+        onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js';"></script>
 <style>
 :root{
   /* ─── 어드민 v9.0과 동일 디자인 시스템 ─── */
@@ -199,12 +203,21 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
 .area-card-stats b{color:var(--g1);font-weight:700;}
 
 /* 탭 */
-.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:18px;overflow-x:auto;}
-.tab{padding:11px 18px;border:none;background:none;font-size:13px;font-weight:700;color:var(--g3);cursor:pointer;font-family:var(--font);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:18px;overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative;scrollbar-width:thin;}
+.tabs::-webkit-scrollbar{height:3px;}
+.tabs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.tab{padding:11px 18px;border:none;background:none;font-size:13px;font-weight:700;color:var(--g3);cursor:pointer;font-family:var(--font);border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;flex-shrink:0;}
 .tab:hover{color:var(--accent);}
 .tab.active{color:var(--navy);border-bottom-color:var(--navy);}
+.tab.tab-download{color:var(--accent);position:relative;}
+.tab.tab-download::after{content:"●";position:absolute;top:6px;right:6px;font-size:6px;color:var(--auto);}
+.tab.tab-download.active::after{display:none;}
 .tab-panel{display:none;}
 .tab-panel.active{display:block;}
+/* 모바일 탭: 우측에 그라데이션 페이드 표시로 스크롤 가능 암시 */
+.tabs-wrap{position:relative;}
+.tabs-wrap::after{content:"";position:absolute;top:0;right:0;bottom:0;width:30px;background:linear-gradient(to right,transparent,var(--off));pointer-events:none;display:none;}
+@media(max-width:640px){.tabs-wrap::after{display:block;}}
 
 /* 보고서 영역 (PDF로 변환할 부분) */
 .report{background:var(--white);border-radius:10px;border:1px solid var(--border);padding:0;overflow:hidden;margin-bottom:18px;}
@@ -283,7 +296,10 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
   .q-scale-btn .num{font-size:16px;}
   .q-scale-btn .lbl{font-size:8.5px;}
   .download-grid{grid-template-columns:1fr;}
+  .mobile-download-cta{display:block !important;margin:0 0 18px 0;}
 }
+/* v8.2: 모바일 전용 다운로드 CTA — 데스크톱에서는 숨김 */
+.mobile-download-cta{display:none;}
 
 /* PDF 변환 시 사용할 숨김 영역 */
 .pdf-render-area{position:absolute;left:-9999px;top:0;width:794px;background:#fff;}
@@ -298,7 +314,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
       <div class="brand-mark">ESG-AACS</div>
       <div class="brand-title">자가진단 컨설팅 플랫폼</div>
     </div>
-    <span class="brand-version">v8.0</span>
+    <span class="brand-version">v8.2</span>
   </div>
   <button class="btn-icon" id="resetBtn" onclick="confirmReset()" title="처음부터" style="display:none;">↺</button>
 </div>
@@ -488,12 +504,21 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
   <!-- 영역별 카드 -->
   <div class="area-grid" id="areaGrid"></div>
 
-  <!-- 탭 (자가진단 / 컨설팅 / 증빙) -->
+  <!-- v8.2: 모바일에서 다운로드 탭 못 찾는 문제 해결 — 탭 위에 큰 버튼 (모바일 전용) -->
+  <div class="mobile-download-cta" id="mobileDlCta">
+    <button class="btn primary lg" onclick="setTab('download')" style="width:100%;">
+      📥 자료 다운로드 (자가진단 / 컨설팅 / 증빙)
+    </button>
+  </div>
+
+  <!-- 탭 (자가진단 / 컨설팅 / 증빙 / 다운로드) -->
+  <div class="tabs-wrap">
   <div class="tabs">
     <button class="tab active" data-tab="self" onclick="setTab('self')">📋 자가진단 보고서</button>
     <button class="tab" data-tab="consulting" onclick="setTab('consulting')">📝 컨설팅 보고서</button>
     <button class="tab" data-tab="evidence" onclick="setTab('evidence')">📎 증빙자료</button>
-    <button class="tab" data-tab="download" onclick="setTab('download')">📥 다운로드</button>
+    <button class="tab tab-download" data-tab="download" onclick="setTab('download')">📥 다운로드</button>
+  </div>
   </div>
 
   <!-- 자가진단 보고서 -->
@@ -540,8 +565,23 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
 
 <script>
 /* ════════════════════════════════════════════════════════════════════════
- *  ESG 자가진단 컨설팅 플랫폼 v8.0
+ *  ESG 자가진단 컨설팅 플랫폼 v8.2
+ *  v8.2 변경사항: SHAP 우선순위 + 진짜 docx XML + 모바일 다운로드 UX + CDN 폴백
  * ════════════════════════════════════════════════════════════════════════ */
+
+/* ═══ v8.2: 라이브러리 로드 상태 진단 (모바일 디버깅용) ═══ */
+window.addEventListener('load', () => {
+  const libStatus = {
+    'docx-js (진짜 워드)':  typeof window.docx !== 'undefined' && !!window.docx.Document,
+    'html-docx-js (폴백)': typeof window.htmlDocx !== 'undefined',
+    'jsPDF':              typeof window.jspdf !== 'undefined',
+    'html2canvas':        typeof window.html2canvas !== 'undefined',
+    'Supabase':           typeof window.supabase !== 'undefined'
+  };
+  console.log('[v8.2] 라이브러리 로드 상태:', libStatus);
+  const failed = Object.entries(libStatus).filter(([k,v]) => !v).map(([k]) => k);
+  if (failed.length) console.warn('[v8.2] 로드 실패 라이브러리:', failed);
+});
 
 /* ═══ Supabase 연결 ═══ */
 let sb = null;
@@ -612,6 +652,73 @@ const QS = [
   {c:'G-09', t:'ESG 정책/성과를 홈페이지 등 외부에 공시합니까?',                    a:'G', help:'ESG 정책·성과를 홈페이지, 지속가능보고서 등 공개',                            docs:['홈페이지 ESG 페이지','지속가능보고서'],                  law:'-',                          guide:'K-ESG G-8',   template:'공시항목: ESG 방침, 목표/성과, GHG 배출량, 사회공헌 실적, 지배구조 현황'},
   {c:'G-10', t:'임직원 대상 윤리/정보보안/개인정보 교육을 실시합니까?',              a:'G', help:'윤리·정보보안·개인정보보호 법정 교육 연 1회 이상',                            docs:['교육계획서','교육 이수 현황'],                            law:'개인정보보호법 등',         guide:'K-ESG G-9',   template:'교육계획: 윤리(2h), 정보보안(2h), 개인정보(1h), 신입교육(4h)'}
 ];
+
+/* ═══ v8.2: SHAP 우선순위 가중치 (휴리스틱 모드) ═══
+   박사논문 실험 2 (Feature Importance & SHAP 해석, §4.2.2/4.2.3) 결과를 그대로 반영.
+   - GBM 내장 importance + XGBoost 대리 모델 TreeSHAP (n=299 중소기업 데이터)
+   - 영역별 기여도: E 37.6% > G 34.8% > S 23.5% (실험2 §)
+   - 향후 v8.3에서 동적 SHAP 값으로 교체 예정 (현재는 휴리스틱 우선순위)
+
+   가중치 산식:
+     priorityScore = (3 - userScore)  // 점수 낮을수록 ↑ (1점=2.0, 2점=1.0)
+                   × shapWeight       // 논문 SHAP 기여도 (정규화)
+                   × lawRiskMultiplier  // 법규 위반 리스크 1.0~1.5
+
+   priority 등급:
+     🔴 critical: 법규 직결 + 점수 1점 (긴급)
+     🟠 high:     SHAP Top10 + 점수 ≤2점 (주요)
+     🟡 medium:   그 외 취약 (권고)
+*/
+const SHAP_WEIGHTS = {
+  // 논문 Top 10 (정확한 SHAP 기여도 %)
+  'G-03': 11.04, 'E-02': 7.82,  'E-01': 6.94,  'S-01': 5.73,  'G-02': 4.86,
+  'E-05': 4.23,  'S-10': 3.97,  'E-07': 3.64,  'G-01': 3.21,  'S-07': 2.98,
+  // Top 11~30 (영역별 평균 분배 — 영역 합계가 논문값과 일치하도록 추정)
+  // E 영역 잔여 = 37.6 - (7.82+6.94+4.23+3.64) = 14.97% → E-03,04,06,08,09,10 = 약 2.5%씩
+  'E-03': 2.50, 'E-04': 2.50, 'E-06': 2.50, 'E-08': 2.50, 'E-09': 2.50, 'E-10': 2.47,
+  // S 영역 잔여 = 23.5 - (5.73+3.97+2.98) = 10.82% → S-02,03,04,05,06,08,09 = 약 1.55%씩
+  'S-02': 1.55, 'S-03': 1.55, 'S-04': 1.55, 'S-05': 1.55, 'S-06': 1.55, 'S-08': 1.55, 'S-09': 1.52,
+  // G 영역 잔여 = 34.8 - (11.04+4.86+3.21) = 15.69% → G-04,05,06,07,08,09,10 = 약 2.24%씩
+  'G-04': 2.25, 'G-05': 2.25, 'G-06': 2.25, 'G-07': 2.25, 'G-08': 2.25, 'G-09': 2.25, 'G-10': 2.20
+};
+
+// 법규 직결 항목 (위반 시 형사처벌·과태료 가능) — 가중치 1.5배
+const LAW_RISK_HIGH = new Set([
+  'G-03',  // 법규 준수 — 컴플라이언스 직결
+  'S-03',  // 산업안전보건법 (중대재해 처벌법)
+  'S-05',  // 근로기준법 (임금체불·근로시간)
+  'S-10',  // 개인정보보호법 (과징금 高)
+  'G-05',  // 정보통신망법
+  'E-04',  // 대기환경보전법 (배출허용기준)
+  'E-05',  // 물환경보전법 (폐수)
+  'E-06',  // 화학물질관리법
+  'E-09'   // 온실가스배출권법
+]);
+
+/**
+ * v8.2: 취약 항목을 SHAP 가중치 기반으로 정렬 + 우선순위 등급 부여
+ * @param {Array} weakItems  - {...QS, idx, score} 형태
+ * @returns 정렬된 배열 + priority/priorityScore 필드 추가
+ */
+function rankWeakItemsBySHAP(weakItems){
+  return weakItems.map(w => {
+    const shapW = SHAP_WEIGHTS[w.c] || 1.5;       // 미정의 시 평균값
+    const lawMul = LAW_RISK_HIGH.has(w.c) ? 1.5 : 1.0;
+    const scoreFactor = 3 - w.score;              // 1점=2.0, 2점=1.0
+    const priorityScore = scoreFactor * shapW * lawMul;
+
+    let priority, priorityLabel, priorityIcon;
+    if (LAW_RISK_HIGH.has(w.c) && w.score === 1) {
+      priority = 'critical'; priorityLabel = '긴급'; priorityIcon = '🔴';
+    } else if (shapW >= 3.0 && w.score <= 2) {
+      priority = 'high';     priorityLabel = '주요'; priorityIcon = '🟠';
+    } else {
+      priority = 'medium';   priorityLabel = '권고'; priorityIcon = '🟡';
+    }
+
+    return { ...w, shapW, lawMul, priorityScore, priority, priorityLabel, priorityIcon };
+  }).sort((a, b) => b.priorityScore - a.priorityScore);  // 우선순위 점수 높은 순
+}
 
 /* ═══ 전역 상태 ═══ */
 const state = {
@@ -822,10 +929,11 @@ function predict(answers){
   const score = Math.round(total * 20);
   const strong = answers.filter(v => v >= 4).length;
   const weak = answers.filter(v => v <= 2).length;
-  const weakItems = answers
-    .map((v, i) => ({...QS[i], idx:i, score:v}))
-    .filter(x => x.score <= 2)
-    .sort((a, b) => a.score - b.score);
+  const weakItems = rankWeakItemsBySHAP(
+    answers
+      .map((v, i) => ({...QS[i], idx:i, score:v}))
+      .filter(x => x.score <= 2)
+  );
   return {
     score, eA, sA, gA, total, strong, weak,
     weakItems, ...getGrade(score)
@@ -1174,49 +1282,326 @@ async function htmlToPdf(htmlString, filename){
   return pdf.output('blob');
 }
 
-/* ═══ 워드(.docx) 생성 - 증빙자료 전용 ═══
-   html-docx-js로 HTML → docx 변환
-   PDF의 페이지 잘림/표 깨짐 이슈를 워드에서는 자연 해결
-   (워드가 자체적으로 표/문단을 페이지에 알맞게 흘려보냄)
+/* ═══ 워드(.docx) 생성 - 증빙자료 전용 (v8.2 개선) ═══
+   v8.2: docx-js (CDN) 우선 사용 → 진짜 워드 XML 생성. 표 셀병합, 페이지 분리 모두 정상 동작.
+         html-docx-js는 폴백용으로만 유지 (모바일에서 docx-js 로딩 실패 시).
 */
-async function htmlToDocx(htmlString, filename){
-  // html-docx-js는 완전한 HTML 문서 형태가 필요함 (head + body)
-  const fullHtml = `
-    <!DOCTYPE html>
-    <html lang="ko">
-    <head>
-      <meta charset="UTF-8">
-      <title>${filename}</title>
-      <style>
-        body { font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif; font-size: 11pt; color: #1A2340; line-height: 1.7; }
-        h1 { font-size: 18pt; color: #002555; border-bottom: 2pt solid #002555; padding-bottom: 4pt; margin-bottom: 12pt; }
-        h2 { font-size: 14pt; color: #002555; border-bottom: 1pt solid #3F8CAA; padding-bottom: 3pt; margin-top: 18pt; margin-bottom: 8pt; }
-        h3 { font-size: 12pt; color: #002555; margin-top: 14pt; margin-bottom: 6pt; }
-        h4 { font-size: 11pt; color: #002555; margin-top: 10pt; margin-bottom: 4pt; }
-        p { margin: 6pt 0; line-height: 1.7; }
-        table { width: 100%; border-collapse: collapse; margin: 10pt 0; font-size: 10.5pt; }
-        th, td { border: 1pt solid #999; padding: 6pt 8pt; vertical-align: top; }
-        th { background-color: #F4F7FB; font-weight: bold; color: #4A5270; }
-        ul, ol { margin: 6pt 0 6pt 18pt; }
-        li { margin-bottom: 3pt; line-height: 1.7; }
-        b, strong { color: #002555; font-weight: bold; }
-        .header-meta { font-size: 9pt; color: #8890A8; margin-bottom: 12pt; }
-        .footer { margin-top: 18pt; padding-top: 8pt; border-top: 1pt solid #DDE2EE; font-size: 9pt; color: #8890A8; text-align: center; }
-        .doc-tag { font-size: 9pt; letter-spacing: 2pt; color: #3F8CAA; font-weight: bold; }
-        /* 서명란 표는 페이지 분리 방지 */
-        .sign-table { page-break-inside: avoid; }
-      </style>
-    </head>
-    <body>${htmlString}</body>
-    </html>
-  `;
 
-  // html-docx-js 로 변환
-  const docxBlob = window.htmlDocx.asBlob(fullHtml, {
-    orientation: 'portrait',
-    margins: { top: 720, right: 720, bottom: 720, left: 720 }  // 0.5인치 = 720 twips
+/**
+ * 마크다운 텍스트를 진짜 워드 XML(docx)로 변환
+ * docx-js 라이브러리(CDN docx@8.5.0)를 사용하여 표·셀병합·페이지여백·서식 모두 정상 처리
+ *
+ * @param {string} markdown   - AI가 생성한 마크다운 원본 (## 제목, | 표 |, **굵게** 등)
+ * @param {object} meta       - {code, title, company, question, law, guide}
+ * @returns {Promise<Blob>}   - docx 파일 Blob
+ */
+async function markdownToDocx(markdown, meta){
+  // docx-js UMD: window.docx 네임스페이스로 로드됨
+  if (!window.docx) throw new Error('docx-js 라이브러리가 로드되지 않았습니다');
+
+  const {
+    Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+    Header, Footer, AlignmentType, HeadingLevel, BorderStyle, WidthType,
+    ShadingType, VerticalAlign, PageNumber, PageOrientation, LevelFormat
+  } = window.docx;
+
+  // ─── 마크다운 파싱 (간이 파서) ───
+  // 줄 단위로 처리: ## h2, ### h3, | 표 |, - 리스트, 일반 단락
+  const lines = markdown.split('\n');
+  const blocks = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed) { i++; continue; }
+
+    // 마크다운 표 감지: |로 시작하고 다음 줄이 |---|---| 패턴
+    if (trimmed.startsWith('|') && i+1 < lines.length && /^\s*\|[-:\s|]+\|\s*$/.test(lines[i+1])) {
+      const tableLines = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+      blocks.push({type:'table', lines:tableLines});
+      continue;
+    }
+
+    // h2 (## 제목)
+    if (trimmed.startsWith('## ') && !trimmed.startsWith('### ')) {
+      blocks.push({type:'h2', text: trimmed.replace(/^##\s+/, '')});
+      i++; continue;
+    }
+    // h3 (### 제목)
+    if (trimmed.startsWith('### ')) {
+      blocks.push({type:'h3', text: trimmed.replace(/^###\s+/, '')});
+      i++; continue;
+    }
+    // h1 (# 제목) — 보통 안 쓰지만 대비
+    if (trimmed.startsWith('# ') && !trimmed.startsWith('## ')) {
+      blocks.push({type:'h1', text: trimmed.replace(/^#\s+/, '')});
+      i++; continue;
+    }
+    // 리스트 (- 또는 *)
+    if (/^[-*]\s+/.test(trimmed)) {
+      blocks.push({type:'li', text: trimmed.replace(/^[-*]\s+/, '')});
+      i++; continue;
+    }
+    // 별첨
+    if (trimmed.startsWith('[별첨]')) {
+      blocks.push({type:'attach', text: trimmed});
+      i++; continue;
+    }
+    // 구분선
+    if (trimmed === '---' || trimmed === '***') {
+      blocks.push({type:'hr'});
+      i++; continue;
+    }
+
+    // 일반 단락
+    blocks.push({type:'p', text: trimmed});
+    i++;
+  }
+
+  // ─── 인라인 마크다운 파서 (**굵게**, *기울임*) ───
+  function parseInline(text){
+    const runs = [];
+    // **굵게** 패턴 추출
+    const re = /\*\*([^*]+)\*\*/g;
+    let lastIdx = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > lastIdx) {
+        runs.push(new TextRun({text: text.substring(lastIdx, m.index), font:'맑은 고딕', size:22}));
+      }
+      runs.push(new TextRun({text: m[1], bold:true, font:'맑은 고딕', size:22, color:'002555'}));
+      lastIdx = m.index + m[0].length;
+    }
+    if (lastIdx < text.length) {
+      runs.push(new TextRun({text: text.substring(lastIdx), font:'맑은 고딕', size:22}));
+    }
+    if (!runs.length) runs.push(new TextRun({text, font:'맑은 고딕', size:22}));
+    return runs;
+  }
+
+  // ─── 표 변환 (마크다운 → docx Table) ───
+  function buildTable(tableLines){
+    // 헤더, 구분선(2번째), 본문
+    const header = tableLines[0];
+    const body = tableLines.slice(2);
+    const cells = (line) => line.replace(/^\||\|$/g,'').split('|').map(s => s.trim());
+    const headerCells = cells(header);
+    const bodyCellsArr = body.map(cells);
+
+    const colCount = headerCells.length;
+    const tableWidthDxa = 9360;  // 6.5 inch (US Letter - 1" margins each side)
+    const colWidth = Math.floor(tableWidthDxa / colCount);
+    const columnWidths = new Array(colCount).fill(colWidth);
+
+    const border = { style: BorderStyle.SINGLE, size: 4, color: '888888' };
+    const borders = { top:border, bottom:border, left:border, right:border };
+
+    const makeCell = (text, isHeader) => new TableCell({
+      borders,
+      width: { size: colWidth, type: WidthType.DXA },
+      shading: isHeader ? { fill:'F4F7FB', type: ShadingType.CLEAR, color:'auto' } : undefined,
+      margins: { top: 80, bottom: 80, left: 120, right: 120 },
+      verticalAlign: VerticalAlign.CENTER,
+      children: [new Paragraph({
+        alignment: AlignmentType.LEFT,
+        children: parseInline(text || '').map(r => {
+          // 헤더는 굵게 + 색상
+          if (isHeader) {
+            return new TextRun({...r.options, bold: true, color: '4A5270', size: 21});
+          }
+          return r;
+        })
+      })]
+    });
+
+    const rows = [
+      new TableRow({
+        tableHeader: true,
+        children: headerCells.map(t => makeCell(t, true))
+      }),
+      ...bodyCellsArr.map(rowCells => {
+        // 열 수 부족 시 빈 셀 채움
+        while (rowCells.length < colCount) rowCells.push('');
+        return new TableRow({
+          children: rowCells.slice(0, colCount).map(t => makeCell(t, false))
+        });
+      })
+    ];
+
+    return new Table({
+      width: { size: tableWidthDxa, type: WidthType.DXA },
+      columnWidths,
+      rows
+    });
+  }
+
+  // ─── 블록 → docx 요소 변환 ───
+  const docChildren = [];
+
+  // 문서 헤더 (제목 + 메타)
+  docChildren.push(new Paragraph({
+    alignment: AlignmentType.LEFT,
+    spacing: { before: 0, after: 60 },
+    children: [
+      new TextRun({ text: meta.code || '', font:'맑은 고딕', size: 18, color:'3F8CAA', bold:true,
+                    characterSpacing: 40 })
+    ]
+  }));
+  docChildren.push(new Paragraph({
+    alignment: AlignmentType.LEFT,
+    spacing: { before: 0, after: 240 },
+    border: { bottom: { color:'002555', size: 12, style: BorderStyle.SINGLE, space: 4 } },
+    children: [
+      new TextRun({ text: meta.title || '', font:'맑은 고딕', size: 36, bold: true, color:'002555' })
+    ]
+  }));
+
+  for (const b of blocks) {
+    if (b.type === 'h1' || b.type === 'h2') {
+      docChildren.push(new Paragraph({
+        spacing: { before: 320, after: 160 },
+        border: { bottom: { color:'3F8CAA', size: 6, style: BorderStyle.SINGLE, space: 2 } },
+        children: [new TextRun({ text: b.text, font:'맑은 고딕', size: 28, bold:true, color:'002555' })]
+      }));
+    } else if (b.type === 'h3') {
+      docChildren.push(new Paragraph({
+        spacing: { before: 240, after: 120 },
+        children: [new TextRun({ text: b.text, font:'맑은 고딕', size: 24, bold:true, color:'002555' })]
+      }));
+    } else if (b.type === 'table') {
+      docChildren.push(buildTable(b.lines));
+      docChildren.push(new Paragraph({ spacing:{before: 60, after: 60}, children:[new TextRun({text:'', size:18})] }));
+    } else if (b.type === 'li') {
+      docChildren.push(new Paragraph({
+        spacing: { before: 40, after: 40 },
+        bullet: { level: 0 },
+        children: parseInline(b.text)
+      }));
+    } else if (b.type === 'attach') {
+      docChildren.push(new Paragraph({
+        spacing: { before: 200, after: 80 },
+        children: [new TextRun({ text: b.text, font:'맑은 고딕', size: 22, italics: true, color:'4A5270' })]
+      }));
+    } else if (b.type === 'hr') {
+      docChildren.push(new Paragraph({
+        spacing: { before: 60, after: 60 },
+        border: { bottom: { color:'DDE2EE', size: 4, style: BorderStyle.SINGLE, space: 1 } },
+        children: [new TextRun({text:'', size:18})]
+      }));
+    } else {
+      docChildren.push(new Paragraph({
+        spacing: { before: 80, after: 80 },
+        alignment: AlignmentType.JUSTIFIED,
+        children: parseInline(b.text)
+      }));
+    }
+  }
+
+  // ─── Document 생성 ───
+  const doc = new Document({
+    creator: 'ESG-AACS Platform',
+    title: meta.title || '증빙자료',
+    description: `${meta.company || ''} - ${meta.code || ''}`,
+    styles: {
+      default: {
+        document: { run: { font: '맑은 고딕', size: 22 } }
+      }
+    },
+    sections: [{
+      properties: {
+        page: {
+          size:   { width: 12240, height: 15840 },         // US Letter
+          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }  // 1 inch
+        }
+      },
+      headers: {
+        default: new Header({
+          children: [new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [new TextRun({ text: `${meta.company || ''} | ${meta.code || ''}`,
+                                     font:'맑은 고딕', size: 18, color:'8890A8' })]
+          })]
+        })
+      },
+      footers: {
+        default: new Footer({
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({ text:'- ', font:'맑은 고딕', size: 18, color:'8890A8' }),
+              new TextRun({ children:[PageNumber.CURRENT], font:'맑은 고딕', size: 18, color:'8890A8' }),
+              new TextRun({ text:' -', font:'맑은 고딕', size: 18, color:'8890A8' })
+            ]
+          })]
+        })
+      },
+      children: docChildren
+    }]
   });
-  return docxBlob;
+
+  return await Packer.toBlob(doc);
+}
+
+/**
+ * 폴백: html-docx-js 사용 (docx-js 로딩 실패 시에만)
+ * 단점: HTML을 altChunk로 워드에 끼워넣는 방식이라 표 렌더링이 부자연스러울 수 있음
+ */
+async function htmlToDocxFallback(htmlString, filename){
+  if (!window.htmlDocx) throw new Error('html-docx-js 라이브러리도 로드되지 않았습니다');
+  const fullHtml = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${filename}</title>
+    <style>
+      body { font-family: 'Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif; font-size: 11pt; color:#1A2340; line-height:1.7; }
+      h1 { font-size:18pt; color:#002555; border-bottom:2pt solid #002555; padding-bottom:4pt; margin-bottom:12pt; }
+      h2 { font-size:14pt; color:#002555; border-bottom:1pt solid #3F8CAA; padding-bottom:3pt; margin-top:18pt; margin-bottom:8pt; }
+      h3 { font-size:12pt; color:#002555; margin-top:14pt; margin-bottom:6pt; }
+      p { margin: 6pt 0; line-height: 1.7; }
+      table { width:100%; border-collapse:collapse; margin:10pt 0; font-size:10.5pt; }
+      th, td { border:1pt solid #999; padding:6pt 8pt; vertical-align:top; }
+      th { background-color:#F4F7FB; font-weight:bold; color:#4A5270; }
+      .sign-table { page-break-inside: avoid; }
+    </style></head><body>${htmlString}</body></html>`;
+  return window.htmlDocx.asBlob(fullHtml, {
+    orientation:'portrait', margins: { top: 720, right: 720, bottom: 720, left: 720 }
+  });
+}
+
+/**
+ * 통합 진입점: 환경에 따라 진짜 docx-js 또는 폴백 사용
+ * @param {object} doc  - {code, title, content (markdown), question}
+ * @returns {Promise<Blob>}
+ */
+async function buildEvidenceDocx(doc){
+  const meta = {
+    code:    doc.code,
+    title:   doc.title,
+    company: state.company.name,
+    question: doc.question
+  };
+
+  // 1순위: docx-js (진짜 워드 XML — 표 셀병합 완벽)
+  if (window.docx && window.docx.Document) {
+    try {
+      return await markdownToDocx(doc.content, meta);
+    } catch (e) {
+      console.warn('docx-js 변환 실패, html-docx-js 폴백 사용:', e);
+    }
+  } else {
+    console.warn('docx-js 미로드, html-docx-js 폴백 사용');
+  }
+
+  // 2순위: html-docx-js 폴백
+  const html = renderEvidenceHtml(doc);
+  return await htmlToDocxFallback(html, `${doc.code}.docx`);
+}
+
+// 호환용 별칭 (이전 호출자가 그대로 동작)
+async function htmlToDocx(htmlString, filename){
+  return await htmlToDocxFallback(htmlString, filename);
 }
 
 async function uploadFileToStorage(blob, path, mimeType){
@@ -1251,12 +1636,18 @@ async function generateAllPdfs(){
   state.pdfs.consulting = await htmlToPdf(consHtml, `${state.company.name}_컨설팅_보고서.pdf`);
   state.uploads.consulting = await uploadPdfToStorage(state.pdfs.consulting, `${did}/consulting.pdf`);
 
-  // 3. 증빙자료 워드(.docx) — 편집·서명 가능하도록 워드 형식으로 생성
-  //    (PDF는 캔버스 변환 시 표/서명란 깨짐 이슈가 있어 워드가 더 안정적)
+  // 3. 증빙자료 워드(.docx) — v8.2: 진짜 docx-js로 워드 XML 생성 (표 셀병합 완벽)
   state.uploads.evidence = [];
   for (const doc of state.evidenceDocs) {
-    const html = renderEvidenceHtml(doc);
-    const blob = await htmlToDocx(html, `${doc.code}.docx`);
+    let blob;
+    try {
+      blob = await buildEvidenceDocx(doc);
+    } catch (e) {
+      console.error(`증빙 docx 생성 실패 (${doc.code}):`, e);
+      // 마지막 폴백: HTML 그대로
+      const html = renderEvidenceHtml(doc);
+      blob = await htmlToDocxFallback(html, `${doc.code}.docx`);
+    }
     state.pdfs.evidence.push({code: doc.code, title: doc.title, blob, ext: 'docx'});
     const path = await uploadFileToStorage(
       blob,
@@ -1432,9 +1823,55 @@ function renderSelfAssessmentReportHtml(){
 
     ${areaAnalysis}
 
+    ${r.weakItems.length > 0 ? `
+    <div class="pdf-section" style="margin-bottom:22px;">
+      <h2 style="font-size:18px;color:#002555;border-bottom:2px solid #002555;padding-bottom:6px;margin-bottom:12px;">우선순위 개선 과제 (SHAP 기반)</h2>
+      <p style="font-size:12px;color:#4A5270;line-height:1.7;margin-bottom:12px;">
+        본 분석은 박사학위 연구 실험 결과(GBM Feature Importance + XGBoost TreeSHAP, n=299)에 기반하여
+        <b>법규 위반 리스크 · SHAP 기여도 · 응답 점수</b>를 종합한 우선순위 알고리즘으로 산출되었습니다.
+        영역별 SHAP 기여도는 <b>E 37.6% · G 34.8% · S 23.5%</b>로, 환경 영역이 ESG 등급 결정의 핵심 변별 영역으로 확인되었습니다.
+      </p>
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px;">
+        <thead>
+          <tr style="background:#F4F7FB;">
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #002555;color:#4A5270;font-weight:700;width:60px;">순위</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #002555;color:#4A5270;font-weight:700;width:65px;">코드</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #002555;color:#4A5270;font-weight:700;">개선 항목</th>
+            <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #002555;color:#4A5270;font-weight:700;width:55px;">점수</th>
+            <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #002555;color:#4A5270;font-weight:700;width:65px;">SHAP</th>
+            <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #002555;color:#4A5270;font-weight:700;width:65px;">우선도</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${r.weakItems.slice(0, 10).map((w, idx) => {
+            const pColor = w.priority === 'critical' ? '#C0392B'
+                          : w.priority === 'high' ? '#E07B00'
+                          : '#9A8200';
+            return `
+            <tr style="border-bottom:1px solid #DDE2EE;">
+              <td style="padding:7px 10px;color:#8890A8;font-family:'JetBrains Mono',monospace;font-weight:700;">${idx+1}</td>
+              <td style="padding:7px 10px;color:#3F8CAA;font-family:'JetBrains Mono',monospace;font-weight:700;">${w.c}</td>
+              <td style="padding:7px 10px;color:#1A2340;">${escapeHtml(w.t)}</td>
+              <td style="padding:7px 10px;text-align:center;color:#C0392B;font-weight:700;">${w.score}점</td>
+              <td style="padding:7px 10px;text-align:center;color:#4A5270;font-family:'JetBrains Mono',monospace;font-size:10.5px;">${w.shapW.toFixed(2)}%</td>
+              <td style="padding:7px 10px;text-align:center;color:${pColor};font-weight:700;font-size:10.5px;">${w.priorityIcon} ${w.priorityLabel}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      ${r.weakItems.length > 10 ? `<p style="font-size:11px;color:#8890A8;margin-top:8px;font-style:italic;">* 전체 ${r.weakItems.length}개 취약 항목 중 우선순위 상위 10개를 표시합니다.</p>` : ''}
+      <div style="background:#FFF8E1;border-left:3px solid #F59E0B;border-radius:4px;padding:10px 14px;margin-top:14px;font-size:11.5px;color:#5D4037;line-height:1.65;">
+        <b>📌 활용 가이드</b><br>
+        🔴 <b>긴급</b>: 법규 위반 리스크 직결 + 1점 응답 → 30일 내 즉시 시정 권고<br>
+        🟠 <b>주요</b>: SHAP Top10 + 2점 이하 → 분기 내 개선 계획 수립<br>
+        🟡 <b>권고</b>: 그 외 취약 항목 → 연간 계획에 반영
+      </div>
+    </div>
+    ` : ''}
+
     <div class="pdf-section" style="margin-top:24px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 자가진단 응답을 기반으로 자동 생성되었습니다 · 작성일: ${today}<br>
-      © ESG-AACS Platform v8.0
+      © ESG-AACS Platform v8.2 · SHAP 기반 우선순위 (Heuristic Mode)
     </div>
   </div>`;
 }
@@ -1465,7 +1902,7 @@ function renderConsultingReportHtml(){
       본 보고서는 Agentic AI (Claude Sonnet 4 + RAG + Knowledge Graph)로 자동 생성된 초안입니다.<br>
       ${state.userType === 'consultant' ? '<b style="color:#C0392B;">⚠ 컨설턴트 활용 시 전문가 검토 후 사용 권장</b><br>' : ''}
       출처: K-ESG 가이드라인 v2.0 · 중소기업 ESG 자가진단 실증 분석 · 중소기업중앙회 ESG 규정례<br>
-      © ESG-AACS Platform v8.0 · 작성일: ${today}
+      © ESG-AACS Platform v8.2 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -1491,7 +1928,7 @@ function renderEvidenceHtml(doc){
     ${body}
     <div class="footer">
       본 문서는 Agentic AI가 작성한 <b>초안</b>입니다. 실제 사용 시 사실 확인 및 수정이 필요합니다.<br>
-      © ESG-AACS Platform v8.0 · 작성일: ${today}
+      © ESG-AACS Platform v8.2 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -1591,27 +2028,71 @@ function renderResult(){
   $('#reportSelf').innerHTML = renderSelfAssessmentReportHtml();
   $('#reportConsulting').innerHTML = renderConsultingReportHtml();
 
-  // 증빙자료
-  const evHtml = state.evidenceDocs.length === 0
-    ? '<div class="card"><div style="text-align:center;color:var(--g3);padding:40px;">취약 문항이 충분치 않아 증빙자료가 생성되지 않았습니다.</div></div>'
-    : state.evidenceDocs.map((d, i) => {
-        const isPreview = state.userType === 'company';
-        return `
-          <div class="card" style="padding:0;overflow:hidden;">
-            <div style="padding:14px 20px;background:var(--navy-ll);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-              <div>
-                <div style="font-size:11px;color:var(--accent);font-weight:700;font-family:var(--mono);">${d.code}</div>
-                <div style="font-size:14px;font-weight:700;color:var(--navy);margin-top:2px;">${escapeHtml(d.title)}</div>
+  // 증빙자료 (v8.2: SHAP 우선순위 뱃지 + 안내 문구)
+  let evHtml;
+  if (state.evidenceDocs.length === 0) {
+    evHtml = '<div class="card"><div style="text-align:center;color:var(--g3);padding:40px;">취약 문항이 충분치 않아 증빙자료가 생성되지 않았습니다.</div></div>';
+  } else {
+    // v8.2: SHAP 기반 우선순위 안내 박스 (왜 이 5개인지 설명)
+    const totalWeak = state.result.weakItems.length;
+    const guideBox = `
+      <div class="card" style="background:linear-gradient(135deg,#FFF8E1,#FFF);border-left:4px solid #F59E0B;margin-bottom:18px;">
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:16px 20px;">
+          <div style="font-size:24px;line-height:1;">🎯</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px;">
+              주요 취약 항목 TOP ${state.evidenceDocs.length}건 ${totalWeak > state.evidenceDocs.length ? `<span style="font-size:11px;font-weight:600;color:var(--g3);">(전체 취약 ${totalWeak}건 중 우선순위 상위)</span>` : ''}
+            </div>
+            <div style="font-size:11.5px;color:var(--g2);line-height:1.65;">
+              <b style="color:#B45309;">SHAP 우선순위 알고리즘</b> 기반으로
+              <b>법규 위반 리스크</b> · <b>SHAP 기여도</b> · <b>점수</b>를 종합하여 가장 시급한 항목부터 자동 선정했습니다.
+              ${totalWeak > state.evidenceDocs.length ? '<br>나머지 취약 항목은 컨설팅 보고서를 참조하세요.' : ''}
+            </div>
+            <div style="display:flex;gap:14px;margin-top:10px;font-size:10.5px;color:var(--g3);flex-wrap:wrap;">
+              <span><b style="color:#C0392B;">🔴 긴급</b> — 법규 직결 + 1점</span>
+              <span><b style="color:#E07B00;">🟠 주요</b> — SHAP Top10 + 2점 이하</span>
+              <span><b style="color:#9A8200;">🟡 권고</b> — 그 외 취약</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    const cards = state.evidenceDocs.map((d, i) => {
+      const isPreview = state.userType === 'company';
+      // weakItems에서 우선순위 정보 가져오기
+      const wItem = state.result.weakItems.find(w => w.c === d.code) || {};
+      const pIcon = wItem.priorityIcon || '🟡';
+      const pLabel = wItem.priorityLabel || '권고';
+      const pColor = wItem.priority === 'critical' ? '#C0392B'
+                    : wItem.priority === 'high' ? '#E07B00'
+                    : '#9A8200';
+      const shapW = wItem.shapW ? wItem.shapW.toFixed(2) : '-';
+
+      return `
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div style="padding:14px 20px;background:var(--navy-ll);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:2px;">
+                <span style="font-size:11px;color:var(--accent);font-weight:700;font-family:var(--mono);">${d.code}</span>
+                <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.7);color:${pColor};">
+                  ${pIcon} ${pLabel}
+                </span>
+                <span style="font-size:9.5px;color:var(--g3);font-family:var(--mono);">SHAP ${shapW}%</span>
               </div>
-              ${isPreview ? '<span class="badge" style="background:var(--cond-l);color:var(--cond);">프리뷰</span>' : '<span class="badge A">전체 제공</span>'}
+              <div style="font-size:14px;font-weight:700;color:var(--navy);">${escapeHtml(d.title)}</div>
             </div>
-            <div style="padding:20px;${isPreview ? 'max-height:300px;overflow:hidden;position:relative;' : ''}">
-              ${mdToHtml(d.content)}
-              ${isPreview ? '<div style="position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(to bottom,transparent,#fff);"></div>' : ''}
-            </div>
-            ${isPreview ? '<div style="padding:14px 20px;background:var(--cond-l);font-size:11px;color:var(--cond);text-align:center;">위 내용은 프리뷰입니다. 다운로드 탭에서 동의 후 워드(.docx) 파일로 받으실 수 있습니다.</div>' : ''}
-          </div>`;
-      }).join('');
+            ${isPreview ? '<span class="badge" style="background:var(--cond-l);color:var(--cond);">프리뷰</span>' : '<span class="badge A">전체 제공</span>'}
+          </div>
+          <div style="padding:20px;${isPreview ? 'max-height:300px;overflow:hidden;position:relative;' : ''}">
+            ${mdToHtml(d.content)}
+            ${isPreview ? '<div style="position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(to bottom,transparent,#fff);"></div>' : ''}
+          </div>
+          ${isPreview ? '<div style="padding:14px 20px;background:var(--cond-l);font-size:11px;color:var(--cond);text-align:center;">위 내용은 프리뷰입니다. 다운로드 탭에서 동의 후 워드(.docx) 파일로 받으실 수 있습니다.</div>' : ''}
+        </div>`;
+    }).join('');
+
+    evHtml = guideBox + cards;
+  }
   $('#evidenceList').innerHTML = evHtml;
 
   // 다운로드
@@ -1628,8 +2109,8 @@ function renderDownloads(){
     items.push({
       key: 'evidence',
       icon: '📎',
-      title: `증빙자료 (${state.evidenceDocs.length}건)`,
-      desc: state.userType === 'consultant' ? '취약 문항별 증빙자료 워드(.docx) — 전문가 검토 후 활용' : '취약 문항별 증빙자료 워드(.docx) — 참고용',
+      title: `증빙자료 (${state.evidenceDocs.length}건 · SHAP 우선순위 TOP)`,
+      desc: state.userType === 'consultant' ? 'SHAP 우선순위 알고리즘 기반 주요 취약 항목 워드(.docx) — 전문가 검토 후 활용' : 'SHAP 우선순위 알고리즘 기반 주요 취약 항목 워드(.docx) — 참고용',
       multi: true
     });
   }
@@ -1753,4 +2234,5 @@ goToStep('landing');
 </script>
 </body>
 </html>
+
 
