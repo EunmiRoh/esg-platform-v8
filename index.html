@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.1</title>
+<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.2</title>
 <meta property="og:title" content="ESG 자가진단 컨설팅 플랫폼">
 <meta property="og:description" content="중소기업 ESG 자가진단 + AI 맞춤형 컨설팅 보고서">
 <meta property="og:type" content="website">
@@ -17,6 +17,8 @@
 <!-- v8.2: 폴백용 (docx-js 로딩 실패 시 사용) -->
 <script src="https://unpkg.com/html-docx-js/dist/html-docx.js"
         onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js';"></script>
+<!-- v8.2.2: 증빙자료 일괄 ZIP 다운로드용 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
   /* ─── 어드민 v9.0과 동일 디자인 시스템 ─── */
@@ -314,7 +316,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
       <div class="brand-mark">ESG-AACS</div>
       <div class="brand-title">자가진단 컨설팅 플랫폼</div>
     </div>
-    <span class="brand-version">v8.2.1</span>
+    <span class="brand-version">v8.2.2</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
     <button class="btn-icon" id="helpBtn" onclick="openHelpGuide()" title="사용 안내" aria-label="사용 안내" style="font-size:18px;font-weight:700;color:var(--accent);">?</button>
@@ -592,9 +594,9 @@ window.addEventListener('load', () => {
     'html2canvas':        typeof window.html2canvas !== 'undefined',
     'Supabase':           typeof window.supabase !== 'undefined'
   };
-  console.log('[v8.2] 라이브러리 로드 상태:', libStatus);
+  console.log('[v8.2.2] 라이브러리 로드 상태:', libStatus);
   const failed = Object.entries(libStatus).filter(([k,v]) => !v).map(([k]) => k);
-  if (failed.length) console.warn('[v8.2] 로드 실패 라이브러리:', failed);
+  if (failed.length) console.warn('[v8.2.2] 로드 실패 라이브러리:', failed);
 });
 
 /* ═══ Supabase 연결 ═══ */
@@ -1254,12 +1256,20 @@ async function generateEvidenceDocs(){
 2. 연락처/이메일 등 임의 데이터는 반드시 "(예시)" 표기
 3. 마크다운 형식으로 작성. 제목은 ## (h2)와 ### (h3) 사용
 4. 수치 데이터는 마크다운 표 사용. 열 수 일정하게 유지
+
+[★ 표 작성 절대 규칙]
+- 모든 표는 헤더와 본문의 컬럼 수가 반드시 동일해야 함
+- 예: 헤더가 4컬럼이면 모든 본문 행도 정확히 4컬럼 (구분 | 성명 | 서명 | 일자)
+- 비어있는 셀은 '-' 또는 '(서명)'으로 명시적 채울 것. 빈 셀이라도 절대 생략 금지
+- 잘못된 예: | 검토 | ○○○ | (서명) |  ← 4번째 컬럼 누락
+- 올바른 예: | 검토 | ○○○ | (서명) | 2026-04-26 |
+
 5. 승인란은 반드시 다음 표 형식으로:
 | 구분 | 성명 | 서명 | 일자 |
 |------|------|------|------|
 | 작성 | ○○○ | (서명) | ${new Date().toISOString().slice(0,10)} |
-| 검토 | ○○○ | (서명) | |
-| 승인 | ○○○ | (서명) | |
+| 검토 | ○○○ | (서명) | - |
+| 승인 | ○○○ | (서명) | - |
 6. 관련법규: ${w.law} | K-ESG: ${w.guide}
 7. 작성가이드: ${w.template}
 8. 별첨 양식이 필요하면 문서 끝에 "[별첨] 양식명" 표시
@@ -1654,6 +1664,29 @@ async function markdownToDocx(markdown, meta){
 }
 
 /**
+ * v8.2.2: html-docx-js 폴백 진입 직전, 모든 <table>의 본문 행 컬럼 수를
+ * 헤더 컬럼 수에 맞춰 부족분만큼 빈 <td>를 자동 추가. AI가 4컬럼 표에서
+ * 마지막 빈 셀을 누락한 경우(승인 표 일자 컬럼 등)를 안전하게 보정.
+ */
+function normalizeTableRows(html) {
+  return html.replace(/<table[^>]*>[\s\S]*?<\/table>/g, (tableHtml) => {
+    const headMatch = tableHtml.match(/<thead>[\s\S]*?<\/thead>/);
+    const headColCount = headMatch ? (headMatch[0].match(/<th/g) || []).length : 0;
+    if (!headColCount) return tableHtml;
+    return tableHtml.replace(/<tr>([\s\S]*?)<\/tr>/g, (rowHtml, inner) => {
+      const tdCount = (inner.match(/<td/g) || []).length;
+      if (tdCount > 0 && tdCount < headColCount) {
+        const lastTdMatch = inner.match(/<td[^>]*>[\s\S]*?<\/td>(?![\s\S]*<td)/);
+        const tdStyle = lastTdMatch ? lastTdMatch[0].match(/<td([^>]*)>/)[1] : '';
+        const fillTd = `<td${tdStyle}>-</td>`.repeat(headColCount - tdCount);
+        return rowHtml.replace('</tr>', fillTd + '</tr>');
+      }
+      return rowHtml;
+    });
+  });
+}
+
+/**
  * 폴백: html-docx-js 사용 (docx-js 로딩 실패 시에만)
  * 단점: HTML을 altChunk로 워드에 끼워넣는 방식이라 표 렌더링이 부자연스러울 수 있음
  */
@@ -1671,7 +1704,7 @@ async function htmlToDocxFallback(htmlString, filename){
       th { background-color:#F4F7FB; font-weight:bold; color:#4A5270; }
       .sign-table { page-break-inside: avoid; }
     </style></head><body>${htmlString}</body></html>`;
-  return window.htmlDocx.asBlob(fullHtml, {
+  return window.htmlDocx.asBlob(normalizeTableRows(fullHtml), {
     orientation:'portrait', margins: { top: 720, right: 720, bottom: 720, left: 720 }
   });
 }
@@ -1708,6 +1741,58 @@ async function buildEvidenceDocx(doc){
 // 호환용 별칭 (이전 호출자가 그대로 동작)
 async function htmlToDocx(htmlString, filename){
   return await htmlToDocxFallback(htmlString, filename);
+}
+
+/* ═══ v8.2.2: 증빙자료 5개 docx 일괄 ZIP 다운로드 ═══
+   buildEvidenceDocx(ev)를 순차 호출하여 docx Blob을 생성하고 JSZip으로 묶음.
+   buildEvidenceDocx는 docx-js 우선, 실패 시 html-docx-js 폴백을 자동 처리. */
+async function downloadAllEvidenceAsZip(){
+  if (!window.JSZip) {
+    showModal('오류', 'ZIP 라이브러리 로드 실패. 페이지 새로고침 후 다시 시도하세요.', [{label:'확인', cls:'primary'}]);
+    return;
+  }
+  const evidenceList = state.evidenceDocs || [];
+  if (!evidenceList.length) {
+    showModal('알림', '증빙자료가 아직 생성되지 않았습니다.', [{label:'확인', cls:'primary'}]);
+    return;
+  }
+
+  showModal('일괄 다운로드 중',
+    `<div style="text-align:center;padding:20px 0;">
+       <div class="spinner" style="margin:0 auto 16px;"></div>
+       <div id="zipProgress" style="font-size:13px;color:#4A5270;">증빙자료 ${evidenceList.length}개를 ZIP으로 묶는 중...</div>
+     </div>`, []);
+
+  try {
+    const zip = new JSZip();
+    for (let i = 0; i < evidenceList.length; i++) {
+      const ev = evidenceList[i];
+      $('#zipProgress').textContent = `(${i+1}/${evidenceList.length}) ${ev.title} 생성 중...`;
+      const blob = await buildEvidenceDocx(ev);
+      const fileName = `${state.company.name}_${ev.code}_${ev.title}.docx`;
+      zip.file(fileName, blob);
+    }
+    $('#zipProgress').textContent = 'ZIP 압축 중...';
+    const zipBlob = await zip.generateAsync({type: 'blob'});
+    const zipName = `${state.company.name}_ESG_증빙자료_전체.zip`;
+
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = zipName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    closeModal();
+    showModal('✅ 완료',
+      `<p style="font-size:14px;line-height:1.7;">증빙자료 ${evidenceList.length}개를 <b>${zipName}</b>로 다운로드했습니다.</p>`,
+      [{label:'확인', cls:'primary'}]);
+  } catch (e) {
+    closeModal();
+    showModal('오류', '일괄 다운로드 실패: ' + escapeHtml(e.message), [{label:'확인', cls:'primary'}]);
+  }
 }
 
 async function uploadFileToStorage(blob, path, mimeType){
@@ -1993,7 +2078,7 @@ function renderSelfAssessmentReportHtml(){
 
     <div class="pdf-section" style="margin-top:24px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 자가진단 응답을 기반으로 자동 생성되었습니다 · 작성일: ${today}<br>
-      © ESG-AACS Platform v8.2.1 · SHAP 기반 우선순위 (Heuristic Mode)
+      © ESG-AACS Platform v8.2.2 · SHAP 기반 우선순위 (Heuristic Mode)
     </div>
   </div>`;
 }
@@ -2125,7 +2210,7 @@ function renderConsultingReportHtml(){
       본 보고서는 Agentic AI (Claude Sonnet 4 + RAG + Knowledge Graph)로 자동 생성된 초안입니다.<br>
       ${state.userType === 'consultant' ? '<b style="color:#C0392B;">⚠ 컨설턴트 활용 시 전문가 검토 후 사용 권장</b><br>' : ''}
       출처: K-ESG 가이드라인 v2.0 · 중소기업 ESG 자가진단 실증 분석 · 중소기업중앙회 ESG 규정례<br>
-      © ESG-AACS Platform v8.2.1 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.2 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -2151,7 +2236,7 @@ function renderEvidenceHtml(doc){
     ${body}
     <div class="footer">
       본 문서는 Agentic AI가 작성한 <b>초안</b>입니다. 실제 사용 시 사실 확인 및 수정이 필요합니다.<br>
-      © ESG-AACS Platform v8.2.1 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.2 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -2314,7 +2399,13 @@ function renderResult(){
         </div>`;
     }).join('');
 
-    evHtml = guideBox + cards;
+    // v8.2.2: 5개 docx 일괄 ZIP 다운로드 버튼
+    const zipBtn = `<div style="margin-bottom:16px;text-align:right;">
+      <button class="btn primary" onclick="downloadAllEvidenceAsZip()">
+        📦 증빙자료 ${state.evidenceDocs.length}개 모두 다운로드 (.zip)
+      </button>
+    </div>`;
+    evHtml = guideBox + zipBtn + cards;
   }
   $('#evidenceList').innerHTML = evHtml;
 
@@ -2457,6 +2548,3 @@ goToStep('landing');
 </script>
 </body>
 </html>
-
-
-
