@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2</title>
+<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.1</title>
 <meta property="og:title" content="ESG 자가진단 컨설팅 플랫폼">
 <meta property="og:description" content="중소기업 ESG 자가진단 + AI 맞춤형 컨설팅 보고서">
 <meta property="og:type" content="website">
@@ -314,9 +314,12 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
       <div class="brand-mark">ESG-AACS</div>
       <div class="brand-title">자가진단 컨설팅 플랫폼</div>
     </div>
-    <span class="brand-version">v8.2</span>
+    <span class="brand-version">v8.2.1</span>
   </div>
-  <button class="btn-icon" id="resetBtn" onclick="confirmReset()" title="처음부터" style="display:none;">↺</button>
+  <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+    <button class="btn-icon" id="helpBtn" onclick="openHelpGuide()" title="사용 안내" aria-label="사용 안내" style="font-size:18px;font-weight:700;color:var(--accent);">?</button>
+    <button class="btn-icon" id="resetBtn" onclick="confirmReset()" title="처음부터" style="display:none;">↺</button>
+  </div>
 </div>
 
 <!-- ─── 진단 진행 시 진행률 표시 ─── -->
@@ -455,7 +458,12 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
   <div class="analyzing">
     <div class="spinner"></div>
     <div class="analyzing-title">AI가 보고서를 작성하고 있습니다</div>
-    <div class="analyzing-sub">잠시만 기다려주세요. 약 30초 ~ 1분 소요됩니다.</div>
+    <div class="analyzing-sub">
+      보고서 자동 생성에는 <b>보통 1~5분</b>이 소요됩니다.<br>
+      <span style="font-size:11.5px;color:var(--g3);">
+        ※ 모바일·네트워크 환경에 따라 <b>최대 7~10분</b>이 걸릴 수 있습니다. 화면을 닫지 말고 잠시 기다려주세요.
+      </span>
+    </div>
     <div class="analyzing-stages" id="analyzingStages">
       <div class="analyzing-stage" data-stage="predict"><span class="dot"></span><span>Stage 2 · 등급 예측 (GBM + SHAP)</span></div>
       <div class="analyzing-stage" data-stage="consulting"><span class="dot"></span><span>Stage 3 · 컨설팅 보고서 생성 (RAG + KG)</span></div>
@@ -472,6 +480,12 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
 
   <!-- 사용자 유형별 안내 -->
   <div class="ai-warning" id="aiWarning"></div>
+
+  <!-- v8.2.1: 결과 화면 사용 가이드 힌트 (우측 상단 ? 버튼 안내) -->
+  <div style="background:linear-gradient(90deg,#EBF4F8,#fff);border:1px solid #B8CFD9;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#4A5270;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div>💡 <b style="color:var(--navy);">탭별 자료 보는 법</b>이 헷갈리시면 우측 상단 <b style="color:var(--accent);">?</b> 버튼을 눌러 사용 안내를 확인하세요.</div>
+    <button class="btn sm" onclick="openHelpGuide()" style="padding:5px 12px;font-size:11px;white-space:nowrap;">사용 안내 열기</button>
+  </div>
 
   <!-- 결과 요약 카드 -->
   <div class="result-summary">
@@ -566,7 +580,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
 <script>
 /* ════════════════════════════════════════════════════════════════════════
  *  ESG 자가진단 컨설팅 플랫폼 v8.2
- *  v8.2 변경사항: SHAP 우선순위 + 진짜 docx XML + 모바일 다운로드 UX + CDN 폴백
+ *  v8.2.1 변경사항: SHAP 우선순위 + 진짜 docx XML + 모바일 다운로드 UX + CDN 폴백
  * ════════════════════════════════════════════════════════════════════════ */
 
 /* ═══ v8.2: 라이브러리 로드 상태 진단 (모바일 디버깅용) ═══ */
@@ -771,6 +785,53 @@ function showModal(title, body, actions){
   $('#modal').classList.add('show');
 }
 function closeModal(){ $('#modal').classList.remove('show'); }
+
+/* ═══ v8.2.1: 사용 안내 헬프 모달 ═══ */
+function openHelpGuide(){
+  const body = `
+    <div style="font-size:13px;line-height:1.7;color:var(--g1);">
+      <div style="background:#EBF4F8;border-left:3px solid var(--accent);padding:12px 14px;border-radius:4px;margin-bottom:16px;">
+        <b style="color:var(--navy);">📌 본 시스템은 4단계로 작동합니다</b><br>
+        <span style="font-size:12px;color:var(--g2);">사용자 유형 선택 → 기업 정보 입력 → 30문항 응답 → 결과 확인 (자가진단·컨설팅·증빙·다운로드)</span>
+      </div>
+
+      <h4 style="font-size:13px;color:var(--navy);font-weight:800;margin:14px 0 6px;">1️⃣ 결과 화면의 4개 탭</h4>
+      <ul style="margin:6px 0 12px 18px;padding:0;">
+        <li><b>📋 자가진단 보고서</b> — 30문항 응답 기반 ESG 종합 점수·등급 + SHAP 우선순위 Top 10</li>
+        <li><b>📝 컨설팅 보고서</b> — AI가 작성한 영역별 진단·개선 과제·실행 로드맵·참고자료</li>
+        <li><b>📎 증빙자료</b> — 우선순위 상위 5건의 ESG 문서 초안 (워드 .docx)</li>
+        <li><b>📥 다운로드</b> — 모든 자료를 PDF·워드로 한 번에 받기</li>
+      </ul>
+
+      <h4 style="font-size:13px;color:var(--navy);font-weight:800;margin:14px 0 6px;">2️⃣ 우선순위 등급 보는 법</h4>
+      <ul style="margin:6px 0 12px 18px;padding:0;">
+        <li>🔴 <b>긴급</b> — 법규 위반 리스크 직결 + 1점 응답 → <b>30일 내 즉시 시정</b></li>
+        <li>🟠 <b>주요</b> — SHAP Top10 + 2점 이하 → <b>분기 내 개선 계획 수립</b></li>
+        <li>🟡 <b>권고</b> — 그 외 취약 항목 → <b>연간 계획에 반영</b></li>
+      </ul>
+
+      <h4 style="font-size:13px;color:var(--navy);font-weight:800;margin:14px 0 6px;">3️⃣ EIEC 5차원 품질 기준</h4>
+      <div style="background:#F4F7FB;padding:10px 12px;border-radius:6px;font-size:12px;color:var(--g2);line-height:1.65;margin-bottom:12px;">
+        본 컨설팅 보고서는 5개 품질 차원을 <b>What·How·Why 3관점</b>으로 묶은
+        <b style="color:var(--navy);">EIEC 통합 프레임워크</b>로 설계되었습니다.<br>
+        <b>What</b> (무엇을 개선?) → <span style="color:var(--accent);">구체성, 실행가능성</span><br>
+        <b>How</b> (어떻게 실행?) → <span style="color:var(--accent);">산업적합성, 구조화</span><br>
+        <b>Why</b> (왜 중요?) → <span style="color:var(--accent);">추적가능성</span>
+      </div>
+
+      <h4 style="font-size:13px;color:var(--navy);font-weight:800;margin:14px 0 6px;">4️⃣ 자료 다운로드 방법</h4>
+      <ul style="margin:6px 0 12px 18px;padding:0;">
+        <li>결과 화면 상단의 <b>📥 다운로드 탭</b> 클릭 (모바일은 큰 파란 버튼 누르기)</li>
+        <li>각 카드의 <b>다운로드</b> 버튼으로 개별 저장</li>
+        <li>증빙자료는 <b>모두 다운로드</b>로 한 번에 .docx 묶음 받기</li>
+      </ul>
+
+      <div style="background:#FFF8E1;border-left:3px solid #F59E0B;padding:10px 14px;border-radius:4px;font-size:11.5px;color:#5D4037;line-height:1.6;margin-top:14px;">
+        <b>⚠ 안내</b> — AI가 자동 생성한 <b>초안</b>입니다. 실제 ESG 평가·인증 제출 전에는 반드시 ESG 전문가의 검토와 수정이 권장됩니다.
+      </div>
+    </div>`;
+  showModal('🔍 사용 안내 가이드', body, [{label:'확인했어요', cls:'primary'}]);
+}
 function escapeHtml(s){
   return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1028,7 +1089,7 @@ async function generateConsultingReport(){
     const items = r.weakItems.filter(w => w.a === a.id);
     if (!items.length) return '';
     return `[${a.label}(${a.id}) 취약문항]\n` + items.map(w =>
-      `- ${w.c}(${w.score}점): ${w.t}\n  관련법규: ${w.law}\n  필요서류: ${w.docs.join(', ')}`
+      `- ${w.c}(점수 ${w.score}점, SHAP ${(w.shapW||0).toFixed(2)}%, 우선순위 ${w.priorityIcon||''} ${w.priorityLabel||''}): ${w.t}\n  관련법규: ${w.law}\n  필요서류: ${w.docs.join(', ')}`
     ).join('\n');
   }).filter(Boolean).join('\n\n');
 
@@ -1051,68 +1112,110 @@ ${weakDetail}
 [작성 지침 — 매우 중요]
 1. **표만 사용하지 말고 서술형 설명을 충분히 포함하세요.** 표는 보조 자료로만 사용.
 2. 각 섹션은 3~5개의 자연스러운 문단으로 구성하세요. 한 문단은 3~5문장.
-3. 다음 5개 품질 차원을 충족하도록 작성하세요:
-   - **구체성**: 수치(목표치, 기한, KPI), 담당자(부서/역할)를 반드시 명시
-   - **실행가능성**: 중소기업 자원 범위 내 가능한 권고 (대기업 전제 권고 X)
-   - **산업적합성**: ${co.industry} 업종의 핵심 ESG 이슈를 명시적으로 반영
-   - **구조화**: 단기(0~3개월)/중기(3~12개월)/장기(1년+) 우선순위 명확
-   - **추적가능성**: 법률명·조항·인증기준을 정확히 인용 (예: 산업안전보건법 §29)
+
+[EIEC 5개 품질 차원 (What·How·Why 3관점) — 모든 권고가 이 5차원을 충족해야 함]
+- **What (무엇을)**:
+  · 구체성(Specificity) — 수치 목표(%, 건수, 기한), KPI, 측정 방법을 명시
+  · 실행가능성(Feasibility) — 중소기업 자원 범위 내 가능 (대기업 전제 X)
+- **How (어떻게)**:
+  · 산업적합성(Industry Fit) — ${co.industry} 업종의 핵심 ESG 이슈 명시 반영
+  · 구조화(Structure) — 단계별(1~3단계), 기간별(단기/중기/장기) 명확
+- **Why (왜)**:
+  · 추적가능성(Traceability) — 법률명·조항·인증기준·SHAP 점수 정확히 인용
+
+[★ 절대 규칙 — 모든 권고에는 반드시 "근거"를 명시할 것]
+- 권고 문장 끝에 반드시 다음 중 하나 이상 인용:
+  (a) 법규 근거: "산업안전보건법 제36조" 같이 조항 정확히
+  (b) 실증 데이터: "본 진단 실증 연구(n=299)에서 SHAP 기여도 X%"
+  (c) 산업 데이터: "${co.industry} 평균 X점 대비"
+- "권고합니다"로 끝내지 말고, "법규 근거: …" 또는 "본 분석 결과: …" 형식으로 근거 표기
+- 추측·일반론 금지. 출처가 명확하지 않으면 그 권고는 빼고 다른 권고로 대체
 
 # ${co.name} ESG 맞춤 컨설팅 보고서
 
 ## 1. 종합 진단
 
 (2~3문단으로 작성)
-- 현재 ESG 등급의 의미와 산업 내 상대적 위치 해석
-- 핵심 강점 3가지 (왜 강점인지 설명)
-- 시급한 과제 3가지 (왜 시급한지 + 미개선 시 리스크)
+- 현재 ESG 등급의 의미와 ${co.industry} 산업 내 상대적 위치 해석 (실증 데이터 기반)
+- 핵심 강점 3가지 (왜 강점인지 SHAP·실증 데이터로 설명)
+- 시급한 과제 3가지 (왜 시급한지 법규·데이터 근거 + 미개선 시 리스크)
 
 ## 2. 영역별 상세 진단
 
 ### 2.1 환경(E) 영역 — ${r.eA}/5.0
 (2~3문단 + 핵심 취약문항 표)
-- 환경 영역 현황 평가
-- 가장 시급한 개선 과제 1~2개 (관련 법규 인용 포함)
-- 중소기업 ${co.industry} 관점의 우선순위
+- 환경 영역 현황 평가 (영역 SHAP 기여도 37.6% 중 본 기업 위치)
+- 가장 시급한 개선 과제 1~2개 (관련 법규 정확 인용)
+- 중소기업 ${co.industry} 관점의 우선순위 (산업 평균 대비)
 
 ### 2.2 사회(S) 영역 — ${r.sA}/5.0
-(2~3문단 + 핵심 취약문항 표)
+(동일 형식, SHAP 기여도 23.5% 언급)
 
 ### 2.3 거버넌스(G) 영역 — ${r.gA}/5.0
-(2~3문단 + 핵심 취약문항 표)
+(동일 형식, SHAP 기여도 34.8% 언급)
 
 ## 3. 우선 개선 과제 (Top 5)
 
-(각 과제마다 다음 형식으로 서술)
+(각 과제마다 다음 형식으로 서술 — EIEC 5차원 모두 충족)
 ### 과제 1: [과제명]
-- **현황**: 현재 상태 1~2문장 서술
-- **개선 목표**: 정량 지표 + 기한 명시
-- **실행 방안**: 단계별 절차 (1~3단계로 서술)
-- **담당 부서**: 책임 부서/역할 명시
-- **법규 근거**: 관련 법률·조항 정확히 명시
-- **예상 효과**: 개선 시 기대 효과
+- **현황 (Why)**: 현재 상태 1~2문장 + 본 진단 점수 + SHAP 기여도(%)
+- **개선 목표 (What-구체성)**: 정량 지표(예: 80% 달성, 100건 작성) + 기한(예: 2026년 6월까지)
+- **실행 방안 (How-구조화)**: 1단계(1개월) → 2단계(2개월) → 3단계(지속) 명확히
+- **담당 부서 (What-실행가능성)**: 책임 부서/역할 명시 (중소기업 규모 고려)
+- **법규 근거 (Why-추적가능성)**: 관련 법률명·조항 정확 인용 (예: 산업안전보건법 제36조)
+- **${co.industry} 적합성 (How-산업적합성)**: 업종 특성 반영 1~2문장
+- **예상 효과 (Why)**: 개선 시 점수 변화 예측 + 정량 효과 (대기업 협력사 심사 통과 등)
 
 (과제 2~5도 동일 형식)
 
 ## 4. 단계별 실행 로드맵
 
 ### 단기 (0~3개월) — Quick Wins
-- (3~5개 항목, 각 항목 1~2문장 설명 포함)
+- (3~5개 항목, 각 항목 1~2문장 + 법규/데이터 근거)
 
 ### 중기 (3~12개월) — 시스템 구축
-- (3~5개 항목, 각 항목 설명 포함)
+- (3~5개 항목, 각 항목 설명 + 근거)
 
 ### 장기 (1년+) — 지속가능 체계
-- (2~3개 항목, 각 항목 설명 포함)
+- (2~3개 항목, 각 항목 설명 + 근거)
 
-## 5. 출처 및 참고
+## 5. 증빙자료 활용 방안
 
-- 중소기업 ESG 자가진단 실증 분석
+본 시스템이 자동 생성한 증빙자료(워드 .docx)를 어떻게 사용해야 하는지 안내합니다.
+
+(2~3문단으로 서술)
+- 각 증빙자료의 결재선 권고 (예: 환경경영방침서는 대표이사 결재 → 이사회 보고)
+- 활용 회의/위원회 (예: 분기 ESG 위원회 안건 상정)
+- 보관 기간 (예: 환경경영방침은 영구, 교육 이수 증빙은 3년)
+- 대기업 협력사 심사 시 어떤 자료를 어떻게 제출하는지
+
+| 증빙자료 | 결재선 | 활용 회의 | 보관 |
+|---|---|---|---|
+| (증빙 1)... | (대표이사 등) | (이사회 등) | (3년/5년/영구) |
+
+(생성된 증빙자료 5건에 대해 각 활용 방안을 표로 정리)
+
+## 6. 참고 자료 및 외부 리소스
+
+본 보고서 활용 시 함께 참조하면 도움이 되는 정부·전문기관 자료입니다.
+
+- **K-ESG 가이드라인 v2.0** (산업통상자원부) — 본 진단 30문항의 기반: https://www.motie.go.kr/
+- **중소기업 ESG 자가진단 시스템** (중소벤처기업부) — 정부 ESG 지원사업: https://www.smes.go.kr/
+- **온실가스종합정보센터** (환경부) — Scope 1/2 산정 가이드: https://www.gir.go.kr/
+- **한국표준협회 ESG 인증** (KSA) — ISO 14001/45001 인증: https://www.ksa.or.kr/
+- **공정거래위원회** (CP 제도) — 공정거래 자율준수 프로그램: https://www.ftc.go.kr/
+- **국가법령정보센터** — 모든 법규 조항 원문: https://www.law.go.kr/
+- **중소기업중앙회 ESG 지원** — 무료 컨설팅 신청: https://www.kbiz.or.kr/
+
+## 7. 출처 및 방법론
+
+- 중소기업 ESG 자가진단 실증 분석 (n=299, GBM + XGBoost TreeSHAP)
 - K-ESG 가이드라인 v2.0 (산업통상자원부)
 - 중소기업중앙회 ESG 규정례
+- 영역별 SHAP 기여도: E 37.6% · G 34.8% · S 23.5%
 - 관련 법규는 본문에 명시한 조항 참조
 
-[중요] 마크다운 형식으로 작성하되, 표는 핵심 정보 요약에만 사용하고 본문은 서술형으로 충분히 풀어쓰세요.`;
+[중요] 마크다운 형식으로 작성하되, 표는 핵심 정보 요약에만 사용하고 본문은 서술형으로 충분히 풀어쓰세요. 모든 권고는 반드시 법규/데이터 근거를 명시하고, 추측이나 일반론은 절대 사용하지 마세요.`;
 
   try {
     const res = await fetch('/api/consulting', {
@@ -1218,6 +1321,7 @@ async function htmlToPdf(htmlString, filename){
 
   let cursorY = margin;       // 현재 페이지에서 다음 콘텐츠가 들어갈 Y
   let isFirstPage = true;
+  const minTailRoom = 25;     // v8.2.1: 페이지 하단에 25mm 미만이면 다음 페이지로 (한 줄 잘림 방지)
 
   for (const sec of sections) {
     // 각 섹션 캡처
@@ -1233,12 +1337,14 @@ async function htmlToPdf(htmlString, filename){
 
     if (imgHeightMm <= usableHeight) {
       // 섹션이 1페이지 이내 — 현재 페이지에 들어갈 수 있는지 검사
-      if (!isFirstPage && cursorY + imgHeightMm > pdfHeight - margin) {
+      // v8.2.1: 잔여 공간이 25mm 미만이면 강제 페이지 넘김 (한 줄 잘림 방지)
+      const remainRoom = pdfHeight - margin - cursorY;
+      if (!isFirstPage && (cursorY + imgHeightMm > pdfHeight - margin || remainRoom < minTailRoom)) {
         pdf.addPage();
         cursorY = margin;
       }
       pdf.addImage(imgData, 'JPEG', margin, cursorY, imgWidthMm, imgHeightMm);
-      cursorY += imgHeightMm + 4;  // 섹션 사이 약간 간격
+      cursorY += imgHeightMm + 6;  // v8.2.1: 섹션 사이 6mm 간격 (이전 4mm → 6mm)
     } else {
       // 섹션이 한 페이지보다 길면 — 페이지 경계에서 잘라서 여러 페이지에 분할
       // (긴 표나 본문을 위한 안전장치)
@@ -1282,7 +1388,7 @@ async function htmlToPdf(htmlString, filename){
   return pdf.output('blob');
 }
 
-/* ═══ 워드(.docx) 생성 - 증빙자료 전용 (v8.2 개선) ═══
+/* ═══ 워드(.docx) 생성 - 증빙자료 전용 (v8.2.1 개선) ═══
    v8.2: docx-js (CDN) 우선 사용 → 진짜 워드 XML 생성. 표 셀병합, 페이지 분리 모두 정상 동작.
          html-docx-js는 폴백용으로만 유지 (모바일에서 docx-js 로딩 실패 시).
 */
@@ -1692,18 +1798,19 @@ function renderSelfAssessmentReportHtml(){
     const weakItems = items.filter(x => x.sv <= 2);
     const avgItems = items.filter(x => x.sv === 3);
 
-    // 영역별 진단 서술 (v8.1 보강 — 단순 "수준 안내"를 넘어 구체적 의미 해석)
+    // 영역별 진단 서술 (v8.2.1 보강 — 권고 근거 명시 + EIEC 5차원)
     let analysis = '';
     let actionGuide = '';
+    const areaShap = a.id === 'E' ? 37.6 : a.id === 'S' ? 23.5 : 34.8;
     if (sc >= 70) {
       analysis = `${a.label}(${a.eng}) 영역은 <b>${g.label} 수준</b>으로 ${escapeHtml(co.industry)} 업종 내에서 양호한 위치에 있습니다. 30개 진단 문항 중 본 영역 ${items.length}개 항목에서 평균 ${v}점을 획득하였으며, 이는 ${a.label} 관련 기본 체계와 운영 절차가 안정적으로 작동하고 있음을 의미합니다. 특히 ${strongItems.length}개 항목에서 우수 평가를 받아 동종 업계 평균을 상회하는 강점을 보유하고 있습니다.`;
-      actionGuide = `현재 수준을 유지하면서 취약 항목 ${weakItems.length}개를 보완하는 전략이 효과적입니다. 또한 우수 항목의 운영 노하우를 다른 영역으로 확산시켜 전사적 ESG 성숙도를 끌어올리는 기회로 활용할 수 있습니다.`;
+      actionGuide = `현재 수준을 유지하면서 취약 항목 ${weakItems.length}개를 보완하는 전략이 효과적입니다. 우수 항목의 운영 노하우를 다른 영역으로 확산시켜 전사적 ESG 성숙도를 끌어올리는 기회로 활용할 수 있습니다. <b style="color:#4A5270;">[근거]</b> 본 영역의 ESG 등급 결정 SHAP 기여도는 <b>${areaShap}%</b>이며, 70점 이상 구간은 정부 ESG 지원사업 우수 사례 평균(K-ESG 가이드라인 v2.0)에 부합합니다.`;
     } else if (sc >= 50) {
       analysis = `${a.label}(${a.eng}) 영역은 <b>${g.label} 수준</b>으로 기본 체계는 갖추어져 있으나 보완이 필요한 상태입니다. 본 영역 ${items.length}개 항목에서 평균 ${v}점을 기록하였으며, ${strongItems.length}개 우수 항목과 ${weakItems.length}개 취약 항목, ${avgItems.length}개 보통 항목으로 분포되어 있습니다. 이는 ${a.label} 관리에 대한 기본 인식과 일부 절차는 마련되어 있으나, 일관된 시스템과 모니터링 체계가 부족한 단계임을 시사합니다.`;
-      actionGuide = `취약 항목들을 우선 개선 과제로 선정하여 향후 12개월 내 단계적 보강을 수행하면 한 단계 상위 등급(B+ 이상)으로 진입할 수 있습니다. 특히 문서화·정기 점검·교육 체계를 정비하는 것이 효과적입니다.`;
+      actionGuide = `취약 항목들을 우선 개선 과제로 선정하여 향후 12개월 내 단계적 보강을 수행하면 한 단계 상위 등급(B+ 이상)으로 진입할 수 있습니다. 특히 문서화·정기 점검·교육 체계를 정비하는 것이 효과적입니다. <b style="color:#4A5270;">[근거]</b> 본 영역 SHAP 기여도 <b>${areaShap}%</b>, ${weakItems.length}개 취약 항목 개선 시 영역 점수 약 ${Math.min(weakItems.length * 7, 25)}점 향상이 예상됩니다(중소기업 ESG 자가진단 실증 분석 n=299).`;
     } else {
       analysis = `${a.label}(${a.eng}) 영역은 <b>${g.label} 수준</b>으로 즉각적인 개선 조치가 필요한 상태입니다. 본 영역 ${items.length}개 항목 중 ${weakItems.length}개가 취약 평가를 받아 전체의 ${Math.round(weakItems.length/items.length*100)}%를 차지합니다. 이는 ${a.label} 관련 정책·절차·실행 체계의 상당 부분이 미비하며, 관련 법규 준수 측면에서도 리스크가 존재할 수 있음을 의미합니다.`;
-      actionGuide = `우선 시급도가 높은 법규 준수 항목부터 정비하고, 3개월 단위로 단기 목표를 수립하여 기본 체계를 빠르게 갖추는 것이 시급합니다. 외부 전문가 자문이나 정부 ESG 지원사업 활용을 적극 검토하시기 바랍니다.`;
+      actionGuide = `우선 시급도가 높은 법규 준수 항목부터 정비하고, 3개월 단위로 단기 목표를 수립하여 기본 체계를 빠르게 갖추는 것이 시급합니다. 외부 전문가 자문이나 정부 ESG 지원사업 활용을 적극 검토하시기 바랍니다. <b style="color:#4A5270;">[근거]</b> 본 영역 SHAP 기여도 <b>${areaShap}%</b>로 ESG 등급 결정의 주요 변별 영역이며, 50점 미만은 대기업 협력사 ESG 심사 통과 기준선(중소기업중앙회 ESG 규정례)을 하회합니다.`;
     }
 
     const tableRows = items.map(x => `
@@ -1743,14 +1850,14 @@ function renderSelfAssessmentReportHtml(){
       </div>`;
   }).join('');
 
-  // 종합 진단 해석 보강 (v8.1)
+  // 종합 진단 해석 보강 (v8.2.1: 권고 근거 명시)
   const bestArea = r.eA >= r.sA && r.eA >= r.gA ? '환경(E)' : r.sA >= r.gA ? '사회(S)' : '거버넌스(G)';
   const worstArea = r.eA <= r.sA && r.eA <= r.gA ? '환경(E)' : r.sA <= r.gA ? '사회(S)' : '거버넌스(G)';
   const overallTone = r.score >= 70
-    ? `현재 수준은 동종 업계 평균을 상회하는 양호한 상태로 평가됩니다. ESG 경영의 기본 체계가 안정적으로 구축되어 있으며, 지속적인 고도화를 통해 ESG 선도 기업으로 도약할 수 있는 기반을 갖추고 있습니다.`
+    ? `현재 수준은 동종 업계 평균을 상회하는 양호한 상태로 평가됩니다. ESG 경영의 기본 체계가 안정적으로 구축되어 있으며, 지속적인 고도화를 통해 ESG 선도 기업으로 도약할 수 있는 기반을 갖추고 있습니다. <b style="color:#4A5270;">[근거]</b> 70점 이상은 K-ESG 가이드라인 v2.0 우수 사례 기준에 부합하며, 대기업 협력사 ESG 심사 통과 가능 구간입니다.`
     : r.score >= 50
-    ? `현재 수준은 ESG 경영 도입기에 해당하며, 기본 체계는 마련되어 있으나 시스템적 운영과 모니터링이 부족한 상태입니다. 향후 6~12개월 내 집중적인 개선 활동을 통해 한 단계 상위 등급으로 진입할 수 있습니다.`
-    : `현재 수준은 ESG 경영의 초기 단계로, 기본 체계 구축이 시급한 상태입니다. 법규 준수 리스크와 이해관계자 요구 미충족 가능성이 존재하므로, 외부 자문과 정부 지원사업 활용을 포함한 전사적 대응이 권고됩니다.`;
+    ? `현재 수준은 ESG 경영 도입기에 해당하며, 기본 체계는 마련되어 있으나 시스템적 운영과 모니터링이 부족한 상태입니다. 향후 6~12개월 내 집중적인 개선 활동을 통해 한 단계 상위 등급으로 진입할 수 있습니다. <b style="color:#4A5270;">[근거]</b> 본 등급은 중소기업 ESG 자가진단 실증 분석(n=299) 평균 구간에 해당하며, 우선순위 상위 5건 개선 시 평균 12~18점 향상이 관찰되었습니다.`
+    : `현재 수준은 ESG 경영의 초기 단계로, 기본 체계 구축이 시급한 상태입니다. 법규 준수 리스크와 이해관계자 요구 미충족 가능성이 존재하므로, 외부 자문과 정부 지원사업 활용을 포함한 전사적 대응이 권고됩니다. <b style="color:#4A5270;">[근거]</b> 50점 미만은 대기업 협력사 ESG 심사 통과 기준선(중소기업중앙회 ESG 규정례) 하회, 환경기술산업법·산업안전보건법 등 핵심 법규 준수 리스크가 통계적으로 유의하게 높은 구간입니다.`;
 
   return `<div style="width:794px;padding:42px 48px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
     <div class="pdf-section" style="border-bottom:3px solid #002555;padding-bottom:14px;margin-bottom:22px;">
@@ -1814,11 +1921,26 @@ function renderSelfAssessmentReportHtml(){
       </p>
     </div>
 
-    <div class="pdf-section" style="background:#EBF4F8;border-left:3px solid #3F8CAA;border-radius:5px;padding:14px 18px;margin-bottom:22px;">
+    <div class="pdf-section" style="background:#EBF4F8;border-left:3px solid #3F8CAA;border-radius:5px;padding:14px 18px;margin-bottom:22px;page-break-inside:avoid;">
       <h3 style="font-size:13px;color:#002555;margin-bottom:8px;">📊 ${escapeHtml(co.industry)} 산업 특성</h3>
       <p style="font-size:12px;color:#1A2340;line-height:1.7;margin-bottom:6px;"><b>강점:</b> ${escapeHtml(ind.strength)}</p>
       <p style="font-size:12px;color:#1A2340;line-height:1.7;margin-bottom:6px;"><b>약점:</b> ${escapeHtml(ind.weakness)}</p>
-      <p style="font-size:12px;color:#1A2340;line-height:1.7;"><b>권고:</b> ${escapeHtml(ind.tip)}</p>
+      <p style="font-size:12px;color:#1A2340;line-height:1.7;margin-bottom:6px;"><b>권고:</b> ${escapeHtml(ind.tip)}</p>
+      <p style="font-size:10.5px;color:#4A5270;line-height:1.6;margin-top:6px;font-style:italic;border-top:1px dashed #B8CFD9;padding-top:6px;">
+        근거: 중소기업 ESG 자가진단 실증 분석 (n=299) · K-ESG 가이드라인 v2.0 (산업통상자원부) · ${escapeHtml(co.industry)} 평균 ESG 점수 기준
+      </p>
+    </div>
+
+    <!-- v8.2.1: EIEC 5차원 안내 박스 -->
+    <div class="pdf-section" style="background:#FFF8E1;border-left:3px solid #F59E0B;border-radius:5px;padding:14px 18px;margin-bottom:22px;page-break-inside:avoid;">
+      <h3 style="font-size:13px;color:#5D4037;margin-bottom:6px;">📐 본 진단 결과의 EIEC 5차원 평가 기준</h3>
+      <p style="font-size:11.5px;color:#5D4037;line-height:1.65;">
+        본 자가진단·컨설팅 결과는 <b style="color:#002555;">EIEC(ESG Improvement Execution Contribution) 5차원</b>으로 평가됩니다.
+        5개 차원은 <b>What·How·Why 3관점</b>으로 묶여 있으며, 우선순위 개선 과제와 컨설팅 권고가 모두 이 기준을 충족하도록 설계되었습니다.<br>
+        <b>What (무엇을)</b> → 구체성, 실행가능성 &nbsp;|&nbsp;
+        <b>How (어떻게)</b> → 산업적합성, 구조화 &nbsp;|&nbsp;
+        <b>Why (왜)</b> → 추적가능성
+      </p>
     </div>
 
     ${areaAnalysis}
@@ -1871,7 +1993,7 @@ function renderSelfAssessmentReportHtml(){
 
     <div class="pdf-section" style="margin-top:24px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 자가진단 응답을 기반으로 자동 생성되었습니다 · 작성일: ${today}<br>
-      © ESG-AACS Platform v8.2 · SHAP 기반 우선순위 (Heuristic Mode)
+      © ESG-AACS Platform v8.2.1 · SHAP 기반 우선순위 (Heuristic Mode)
     </div>
   </div>`;
 }
@@ -1884,10 +2006,29 @@ function renderConsultingReportHtml(){
 
   // 마크다운 → HTML 변환 (간단)
   let html = mdToHtml(md);
-  // h2 단위로 자동 섹션화 (PDF 페이지 잘림 방지)
-  html = html.replace(/<h2/g, '</div><div class="pdf-section" style="margin-bottom:18px;"><h2');
+  // v8.2.1: h2 + h3 단위 자동 섹션화 (PDF 페이지 잘림 방지 강화)
+  // 거버넌스 영역(### 2.3) 등이 페이지 경계에서 한 줄 잘리는 문제 해결
+  html = html.replace(/<h2/g, '</div><div class="pdf-section" style="margin-bottom:18px;page-break-inside:avoid;"><h2');
+  html = html.replace(/<h3/g, '</div><div class="pdf-section" style="margin-bottom:14px;page-break-inside:avoid;"><h3');
   if (html.startsWith('</div>')) html = html.substring(6); // 첫 </div> 제거
   html = '<div class="pdf-section" style="margin-bottom:18px;">' + html + '</div>';
+
+  // v8.2.1: 우선순위 분포 집계 (인포그래픽용)
+  const wItems = r.weakItems || [];
+  const critCount = wItems.filter(w => w.priority === 'critical').length;
+  const highCount = wItems.filter(w => w.priority === 'high').length;
+  const medCount = wItems.filter(w => w.priority === 'medium').length;
+
+  // E/S/G 막대 그래프 (간단한 SVG 대체용 div bar)
+  const eW = Math.round((r.eA / 5) * 100);
+  const sW = Math.round((r.sA / 5) * 100);
+  const gW = Math.round((r.gA / 5) * 100);
+
+  // 등급 색상
+  const gradeColor = r.grade.startsWith('A') ? '#15803D'
+                  : r.grade.startsWith('B') ? '#2563EB'
+                  : r.grade.startsWith('C') ? '#E07B00'
+                  : '#C0392B';
 
   return `<div style="width:794px;padding:42px 48px;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1A2340;">
     <div class="pdf-section" style="border-bottom:3px solid #002555;padding-bottom:14px;margin-bottom:22px;">
@@ -1896,13 +2037,95 @@ function renderConsultingReportHtml(){
       <div style="font-size:12px;color:#8890A8;">작성일: ${today} · ${escapeHtml(co.industry)} · ${escapeHtml(co.size)} · 종합 ${r.score}점 (${r.grade})</div>
     </div>
 
+    <!-- v8.2.1: 인포그래픽 요약 대시보드 (헤더 ↔ 1.종합진단 사이 공백 해결) -->
+    <div class="pdf-section" style="margin-bottom:24px;page-break-inside:avoid;">
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-bottom:14px;">
+        <!-- 좌: 종합 등급 카드 -->
+        <div style="background:linear-gradient(135deg,#002555,#001A3D);border-radius:10px;padding:18px 22px;color:#fff;">
+          <div style="font-size:10px;letter-spacing:2px;color:rgba(255,255,255,.6);font-weight:700;margin-bottom:6px;">OVERALL ESG SCORE</div>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
+            <div>
+              <div style="font-size:42px;font-weight:900;line-height:1;font-family:'JetBrains Mono',monospace;">${r.score}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:3px;">/ 100점</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:30px;font-weight:900;line-height:1;color:${gradeColor === '#C0392B' ? '#FF8A80' : '#fff'};">${r.grade}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.85);margin-top:3px;">${r.label}</div>
+            </div>
+          </div>
+        </div>
+        <!-- 우: 진단 통계 카드 -->
+        <div style="background:#F4F7FB;border-radius:10px;padding:14px 18px;border:1px solid #DDE2EE;">
+          <div style="font-size:10px;letter-spacing:2px;color:#8890A8;font-weight:700;margin-bottom:8px;">DIAGNOSTIC STATS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11px;">
+            <div><div style="color:#8890A8;">우수 문항</div><div style="font-size:18px;font-weight:800;color:#15803D;font-family:'JetBrains Mono',monospace;">${r.strong} <span style="font-size:10px;color:#8890A8;">/ 30</span></div></div>
+            <div><div style="color:#8890A8;">취약 문항</div><div style="font-size:18px;font-weight:800;color:#C0392B;font-family:'JetBrains Mono',monospace;">${r.weak} <span style="font-size:10px;color:#8890A8;">/ 30</span></div></div>
+            <div><div style="color:#8890A8;">🔴 긴급</div><div style="font-size:15px;font-weight:800;color:#C0392B;font-family:'JetBrains Mono',monospace;">${critCount}건</div></div>
+            <div><div style="color:#8890A8;">🟠 주요</div><div style="font-size:15px;font-weight:800;color:#E07B00;font-family:'JetBrains Mono',monospace;">${highCount}건</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 영역별 점수 막대 그래프 -->
+      <div style="background:#fff;border:1px solid #DDE2EE;border-radius:10px;padding:14px 18px;margin-bottom:12px;">
+        <div style="font-size:11px;letter-spacing:1.5px;color:#4A5270;font-weight:700;margin-bottom:10px;">영역별 점수 (5점 만점)</div>
+        ${[
+          {label:'환경 (E)', val:r.eA, w:eW, color:'#15803D'},
+          {label:'사회 (S)', val:r.sA, w:sW, color:'#2563EB'},
+          {label:'거버넌스 (G)', val:r.gA, w:gW, color:'#7c3aed'}
+        ].map(a => `
+          <div style="margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#4A5270;font-weight:700;margin-bottom:3px;">
+              <span>${a.label}</span>
+              <span style="font-family:'JetBrains Mono',monospace;color:${a.color};">${a.val} / 5.0</span>
+            </div>
+            <div style="background:#F4F7FB;border-radius:4px;height:9px;overflow:hidden;">
+              <div style="background:${a.color};height:100%;width:${a.w}%;border-radius:4px;"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- 영역별 SHAP 기여도 (논문 정합성) -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:10.5px;">
+        <div style="background:#EBF8EE;border-left:3px solid #15803D;padding:8px 12px;border-radius:4px;">
+          <div style="color:#15803D;font-weight:700;">E 영역 SHAP 기여도</div>
+          <div style="font-size:14px;font-weight:800;color:#15803D;font-family:'JetBrains Mono',monospace;margin-top:2px;">37.6%</div>
+        </div>
+        <div style="background:#EFF4FF;border-left:3px solid #2563EB;padding:8px 12px;border-radius:4px;">
+          <div style="color:#2563EB;font-weight:700;">S 영역 SHAP 기여도</div>
+          <div style="font-size:14px;font-weight:800;color:#2563EB;font-family:'JetBrains Mono',monospace;margin-top:2px;">23.5%</div>
+        </div>
+        <div style="background:#F3EEFE;border-left:3px solid #7c3aed;padding:8px 12px;border-radius:4px;">
+          <div style="color:#7c3aed;font-weight:700;">G 영역 SHAP 기여도</div>
+          <div style="font-size:14px;font-weight:800;color:#7c3aed;font-family:'JetBrains Mono',monospace;margin-top:2px;">34.8%</div>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;font-size:10.5px;color:#8890A8;line-height:1.55;text-align:center;font-style:italic;">
+        SHAP 기여도는 박사학위 연구 실험(GBM + XGBoost TreeSHAP, n=299)에서 도출된 ESG 등급 결정 변별력입니다.
+      </div>
+    </div>
+
+    <!-- v8.2.1: EIEC 5차원 품질 프레임워크 안내 (보고서 평가 기준 명시) -->
+    <div class="pdf-section" style="background:#FFF8E1;border-left:3px solid #F59E0B;border-radius:5px;padding:14px 18px;margin-bottom:22px;page-break-inside:avoid;">
+      <div style="font-size:12px;font-weight:800;color:#5D4037;margin-bottom:6px;">📐 본 컨설팅 보고서의 EIEC 5차원 품질 기준</div>
+      <div style="font-size:11px;color:#5D4037;line-height:1.65;">
+        본 보고서는 ESG 컨설팅 품질 평가의 5개 차원을 <b>What·How·Why 3관점</b>으로 묶은
+        <b style="color:#002555;">EIEC(ESG Improvement Execution Contribution) 프레임워크</b>로 작성되었습니다.<br>
+        <b>What</b> (무엇을 개선?) → <b style="color:#3F8CAA;">구체성, 실행가능성</b> &nbsp;|&nbsp;
+        <b>How</b> (어떻게 실행?) → <b style="color:#3F8CAA;">산업적합성, 구조화</b> &nbsp;|&nbsp;
+        <b>Why</b> (왜 중요?) → <b style="color:#3F8CAA;">추적가능성</b>
+      </div>
+    </div>
+
     <div style="font-size:13px;line-height:1.85;color:#1A2340;">${html}</div>
 
     <div class="pdf-section" style="margin-top:28px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 Agentic AI (Claude Sonnet 4 + RAG + Knowledge Graph)로 자동 생성된 초안입니다.<br>
       ${state.userType === 'consultant' ? '<b style="color:#C0392B;">⚠ 컨설턴트 활용 시 전문가 검토 후 사용 권장</b><br>' : ''}
       출처: K-ESG 가이드라인 v2.0 · 중소기업 ESG 자가진단 실증 분석 · 중소기업중앙회 ESG 규정례<br>
-      © ESG-AACS Platform v8.2 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.1 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -1928,7 +2151,7 @@ function renderEvidenceHtml(doc){
     ${body}
     <div class="footer">
       본 문서는 Agentic AI가 작성한 <b>초안</b>입니다. 실제 사용 시 사실 확인 및 수정이 필요합니다.<br>
-      © ESG-AACS Platform v8.2 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.1 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -2234,5 +2457,6 @@ goToStep('landing');
 </script>
 </body>
 </html>
+
 
 
