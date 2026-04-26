@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.5</title>
+<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.6</title>
 <meta property="og:title" content="ESG 자가진단 컨설팅 플랫폼">
 <meta property="og:description" content="중소기업 ESG 자가진단 + AI 맞춤형 컨설팅 보고서">
 <meta property="og:type" content="website">
@@ -319,7 +319,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
       <div class="brand-mark">ESG-AACS</div>
       <div class="brand-title">자가진단 컨설팅 플랫폼</div>
     </div>
-    <span class="brand-version">v8.2.5</span>
+    <span class="brand-version">v8.2.6</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
     <button class="btn-icon" id="helpBtn" onclick="openHelpGuide()" title="사용 안내" aria-label="사용 안내" style="font-size:18px;font-weight:700;color:var(--accent);">?</button>
@@ -598,9 +598,9 @@ window.addEventListener('load', () => {
     typeof window.docx.Table === 'function'
   );
   if (docxLoaded) {
-    console.log('[v8.2.5] ✅ docx-js 정상 로드 (진짜 워드 경로 활성)');
+    console.log('[v8.2.6] ✅ docx-js 정상 로드 (진짜 워드 경로 활성)');
   } else {
-    console.warn('[v8.2.5] ⚠️ docx-js 미로드 — html-docx-js 폴백 사용');
+    console.warn('[v8.2.6] ⚠️ docx-js 미로드 — html-docx-js 폴백 사용');
   }
   const libStatus = {
     'docx-js (진짜 워드)':  docxLoaded,
@@ -609,9 +609,9 @@ window.addEventListener('load', () => {
     'html2canvas':        typeof window.html2canvas !== 'undefined',
     'Supabase':           typeof window.supabase !== 'undefined'
   };
-  console.log('[v8.2.5] 라이브러리 로드 상태:', libStatus);
+  console.log('[v8.2.6] 라이브러리 로드 상태:', libStatus);
   const failed = Object.entries(libStatus).filter(([k,v]) => !v).map(([k]) => k);
-  if (failed.length) console.warn('[v8.2.5] 로드 실패 라이브러리:', failed);
+  if (failed.length) console.warn('[v8.2.6] 로드 실패 라이브러리:', failed);
 });
 
 /* ═══ Supabase 연결 ═══ */
@@ -1378,7 +1378,7 @@ async function htmlToPdf(htmlString, filename){
   let cursorY = margin;       // 현재 페이지에서 다음 콘텐츠가 들어갈 Y
   let isFirstPage = true;
   const minTailRoom = 45;     // v8.2.4: 페이지 하단에 45mm 미만이면 다음 페이지로 (이전 35mm → 45mm, 잘림 방지 추가 보강)
-  const lineHeightBuffer = 6; // v8.2.4: 한 줄 분량의 안전 마진 (mm) — 페이지 분할 조건에 가산
+  const lineHeightBuffer = 12; // v8.2.6: 6mm → 12mm (두 줄 분량 안전 마진) — 페이지 분할 조건에 가산
 
   for (const sec of sections) {
     // 각 섹션 캡처
@@ -1668,13 +1668,17 @@ async function markdownToDocx(markdown, meta){
       verticalAlign: VerticalAlign.CENTER,
       children: [new Paragraph({
         alignment: AlignmentType.LEFT,
-        children: parseInline(text || '').map(r => {
-          // 헤더는 굵게 + 색상
-          if (isHeader) {
-            return new TextRun({...r.options, bold: true, color: '4A5270', size: 21});
-          }
-          return r;
-        })
+        // v8.2.6: 헤더는 parseInline().map(...r.options) 패턴이 r.options=undefined로
+        // text 손실시키는 버그가 있어, text를 직접 전달하는 단일 TextRun으로 교체
+        children: isHeader
+          ? [new TextRun({
+              text: text || '',
+              bold: true,
+              color: '4A5270',
+              size: 21,
+              font: '맑은 고딕'
+            })]
+          : parseInline(text || '')
       })]
     });
 
@@ -2257,7 +2261,7 @@ function renderSelfAssessmentReportHtml(){
 
     <div class="pdf-section" style="margin-top:24px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 자가진단 응답을 기반으로 자동 생성되었습니다 · 작성일: ${today}<br>
-      © ESG-AACS Platform v8.2.5 · SHAP 기반 우선순위 (Heuristic Mode)
+      © ESG-AACS Platform v8.2.6 · SHAP 기반 우선순위 (Heuristic Mode)
     </div>
   </div>`;
 }
@@ -2389,7 +2393,7 @@ function renderConsultingReportHtml(){
       본 보고서는 Agentic AI (Claude Sonnet 4 + RAG + Knowledge Graph)로 자동 생성된 초안입니다.<br>
       ${state.userType === 'consultant' ? '<b style="color:#C0392B;">⚠ 컨설턴트 활용 시 전문가 검토 후 사용 권장</b><br>' : ''}
       출처: K-ESG 가이드라인 v2.0 · 중소기업 ESG 자가진단 실증 분석 · 중소기업중앙회 ESG 규정례<br>
-      © ESG-AACS Platform v8.2.5 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.6 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -2415,7 +2419,7 @@ function renderEvidenceHtml(doc){
     ${body}
     <div class="footer">
       본 문서는 Agentic AI가 작성한 <b>초안</b>입니다. 실제 사용 시 사실 확인 및 수정이 필요합니다.<br>
-      © ESG-AACS Platform v8.2.5 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.6 · 작성일: ${today}
     </div>
   </div>`;
 }
