@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.4</title>
+<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.5</title>
 <meta property="og:title" content="ESG 자가진단 컨설팅 플랫폼">
 <meta property="og:description" content="중소기업 ESG 자가진단 + AI 맞춤형 컨설팅 보고서">
 <meta property="og:type" content="website">
@@ -319,7 +319,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
       <div class="brand-mark">ESG-AACS</div>
       <div class="brand-title">자가진단 컨설팅 플랫폼</div>
     </div>
-    <span class="brand-version">v8.2.4</span>
+    <span class="brand-version">v8.2.5</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
     <button class="btn-icon" id="helpBtn" onclick="openHelpGuide()" title="사용 안내" aria-label="사용 안내" style="font-size:18px;font-weight:700;color:var(--accent);">?</button>
@@ -598,9 +598,9 @@ window.addEventListener('load', () => {
     typeof window.docx.Table === 'function'
   );
   if (docxLoaded) {
-    console.log('[v8.2.4] ✅ docx-js 정상 로드 (진짜 워드 경로 활성)');
+    console.log('[v8.2.5] ✅ docx-js 정상 로드 (진짜 워드 경로 활성)');
   } else {
-    console.warn('[v8.2.4] ⚠️ docx-js 미로드 — html-docx-js 폴백 사용');
+    console.warn('[v8.2.5] ⚠️ docx-js 미로드 — html-docx-js 폴백 사용');
   }
   const libStatus = {
     'docx-js (진짜 워드)':  docxLoaded,
@@ -609,9 +609,9 @@ window.addEventListener('load', () => {
     'html2canvas':        typeof window.html2canvas !== 'undefined',
     'Supabase':           typeof window.supabase !== 'undefined'
   };
-  console.log('[v8.2.4] 라이브러리 로드 상태:', libStatus);
+  console.log('[v8.2.5] 라이브러리 로드 상태:', libStatus);
   const failed = Object.entries(libStatus).filter(([k,v]) => !v).map(([k]) => k);
-  if (failed.length) console.warn('[v8.2.4] 로드 실패 라이브러리:', failed);
+  if (failed.length) console.warn('[v8.2.5] 로드 실패 라이브러리:', failed);
 });
 
 /* ═══ Supabase 연결 ═══ */
@@ -1283,6 +1283,26 @@ async function generateEvidenceDocs(){
 4. KPI/측정지표 표는 반드시 다음 형태의 헤더로 시작:
    | 항목 | 지표 | 단위 | 현재값 | 목표값 | 기한 | (또는 유사한 의미 있는 헤더)
 
+[★★★ 표 헤더 절대 필수 - v8.2.5 최강화]
+중대 경고: 빈 헤더 행을 만들면 시스템이 자동으로 본문 첫 행을 헤더로 승격하지만,
+이는 표의 의미를 왜곡합니다. 반드시 다음을 지키세요:
+
+❌ 절대 금지 패턴:
+  | | | | | |
+  |  |  |  |  |  |
+  |---|---|---|---|---|---|  ← 분리선만 있는 헤더
+  | -- | -- | -- | -- |       ← 분리선 변형
+  | 1 | 2 | 3 | 4 | 5 |       ← 의미 없는 숫자
+
+✅ 필수 패턴 (의미 있는 명사로 헤더 작성):
+  | 항목 | 측정지표 | 단위 | 목표값 | 기한 | 담당 |
+  | 구분 | 성명 | 서명 | 일자 |
+  | 영역 | 활동 | 책임자 | 일정 |
+  | 단계 | 내용 | 산출물 | 비고 |
+
+표 작성 시 각 컬럼이 무엇을 의미하는지 명확히 명시한 후에만 데이터를 채우세요.
+헤더 작성을 망각했다면 절대 표를 만들지 말고 콜론 형식의 정의 목록을 사용하세요.
+
 [★ 표 작성 절대 규칙]
 - 모든 표는 헤더와 본문의 컬럼 수가 반드시 동일해야 함
 - 예: 헤더가 4컬럼이면 모든 본문 행도 정확히 4컬럼 (구분 | 성명 | 서명 | 일자)
@@ -1533,8 +1553,51 @@ async function markdownToDocx(markdown, meta){
     return runs;
   }
 
+  // v8.2.5: 본문 데이터 패턴으로 헤더 추측
+  function inferHeadersFromBody(bodyArr, colCount) {
+    if (!bodyArr || bodyArr.length === 0) {
+      return Array.from({length: colCount}, (_, i) => `항목 ${i+1}`);
+    }
+
+    const headers = [];
+    for (let col = 0; col < colCount; col++) {
+      const colValues = bodyArr.map(row => (row[col] || '').trim()).filter(Boolean);
+      const sample = colValues.slice(0, 3).join(' ');
+
+      // 패턴 매칭: 자주 나오는 표 컬럼 추측
+      if (/\d+%/.test(sample) && /\d+\.\d+%/.test(sample)) {
+        headers.push('비율(%)');
+      } else if (/\d+년|\d+월|\d{4}-\d{2}/.test(sample)) {
+        headers.push('일자');
+      } else if (/^(작성|검토|승인|확인)$/.test(colValues[0] || '')) {
+        headers.push('구분');
+      } else if (/^○+$|서명|날인/.test(sample)) {
+        headers.push('서명');
+      } else if (/^\d+(\.\d+)?$/.test(colValues[0] || '')) {
+        headers.push('값');
+      } else if (/kWh|MWh|tCO2|kg|톤|L|Nm|%|개|건|회/.test(sample)) {
+        headers.push('단위/측정값');
+      } else if (col === 0) {
+        headers.push('항목');
+      } else if (col === colCount - 1) {
+        headers.push('비고');
+      } else {
+        headers.push(`항목 ${col+1}`);
+      }
+    }
+    return headers;
+  }
+
   // ─── 표 변환 (마크다운 → docx Table) ───
   function buildTable(tableLines){
+    // v8.2.5: 진입 로그 - 모든 표 처리 추적
+    console.log('[v8.2.5] buildTable 진입:', {
+      totalLines: tableLines.length,
+      firstLine: tableLines[0]?.slice(0, 80),
+      secondLine: tableLines[1]?.slice(0, 80),
+      thirdLine: tableLines[2]?.slice(0, 80)
+    });
+
     // 헤더, 구분선(2번째), 본문
     const header = tableLines[0];
     const body = tableLines.slice(2);
@@ -1542,20 +1605,50 @@ async function markdownToDocx(markdown, meta){
     let headerCells = cells(header);
     let bodyCellsArr = body.map(cells);
 
-    // v8.2.4: 헤더 빈 행 자동 감지 + 보정 (AI가 빈 헤더 만들어도 첫 본문 행을 헤더로 승격)
-    const headerEmpty = headerCells.every(c => !c || c.trim() === '');
-    if (headerEmpty && bodyCellsArr.length > 0) {
-      console.warn('[v8.2.4] buildTable: 빈 헤더 감지 — 첫 본문 행을 헤더로 승격', {
-        original: tableLines.slice(0, 3),
-        promoted: bodyCellsArr[0]
-      });
+    // v8.2.5: 헤더 강제 보정 — 의미 없는 헤더 모든 케이스 처리
+    function isCellMeaningful(c) {
+      if (!c) return false;
+      const trimmed = c.trim();
+      if (!trimmed) return false;
+      // 분리선 패턴 (---, ---, :--:, --- 등)
+      if (/^[-:\s]+$/.test(trimmed)) return false;
+      // 구두점만 있는 경우
+      if (/^[\s\.\,\-\—\=]+$/.test(trimmed)) return false;
+      return true;
+    }
+
+    const meaningfulHeaders = headerCells.filter(isCellMeaningful).length;
+    const totalHeaders = headerCells.length;
+    const headerWeak = meaningfulHeaders < Math.ceil(totalHeaders / 2); // 절반 미만이 의미 없으면 약한 헤더
+
+    console.log('[v8.2.5] 헤더 검증:', {
+      cells: headerCells,
+      meaningful: meaningfulHeaders,
+      total: totalHeaders,
+      weak: headerWeak
+    });
+
+    if (headerWeak && bodyCellsArr.length > 0) {
+      // 첫 본문 행 검사
       const firstBody = bodyCellsArr[0];
-      const firstBodyMeaningful = firstBody.some(c => c && c.trim() !== '');
-      if (firstBodyMeaningful) {
+      const firstBodyMeaningful = firstBody.filter(isCellMeaningful).length;
+
+      if (firstBodyMeaningful >= Math.ceil(firstBody.length / 2)) {
+        // 첫 본문 행이 의미 있으면 헤더로 승격
+        console.warn('[v8.2.5] ⚠️ 약한 헤더 감지 → 첫 본문 행을 헤더로 승격', {
+          oldHeader: headerCells,
+          newHeader: firstBody
+        });
         headerCells = firstBody;
         bodyCellsArr = bodyCellsArr.slice(1);
       } else {
-        headerCells = headerCells.map((_, i) => `항목 ${i+1}`);
+        // 첫 본문 행도 의미 없으면 컨텍스트 기반 자동 헤더 생성
+        const autoHeaders = inferHeadersFromBody(bodyCellsArr, totalHeaders);
+        console.warn('[v8.2.5] ⚠️ 약한 헤더 + 약한 본문 → 자동 헤더 생성', {
+          oldHeader: headerCells,
+          autoHeader: autoHeaders
+        });
+        headerCells = autoHeaders;
       }
     }
 
@@ -2164,7 +2257,7 @@ function renderSelfAssessmentReportHtml(){
 
     <div class="pdf-section" style="margin-top:24px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 자가진단 응답을 기반으로 자동 생성되었습니다 · 작성일: ${today}<br>
-      © ESG-AACS Platform v8.2.4 · SHAP 기반 우선순위 (Heuristic Mode)
+      © ESG-AACS Platform v8.2.5 · SHAP 기반 우선순위 (Heuristic Mode)
     </div>
   </div>`;
 }
@@ -2296,7 +2389,7 @@ function renderConsultingReportHtml(){
       본 보고서는 Agentic AI (Claude Sonnet 4 + RAG + Knowledge Graph)로 자동 생성된 초안입니다.<br>
       ${state.userType === 'consultant' ? '<b style="color:#C0392B;">⚠ 컨설턴트 활용 시 전문가 검토 후 사용 권장</b><br>' : ''}
       출처: K-ESG 가이드라인 v2.0 · 중소기업 ESG 자가진단 실증 분석 · 중소기업중앙회 ESG 규정례<br>
-      © ESG-AACS Platform v8.2.4 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.5 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -2322,7 +2415,7 @@ function renderEvidenceHtml(doc){
     ${body}
     <div class="footer">
       본 문서는 Agentic AI가 작성한 <b>초안</b>입니다. 실제 사용 시 사실 확인 및 수정이 필요합니다.<br>
-      © ESG-AACS Platform v8.2.4 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.5 · 작성일: ${today}
     </div>
   </div>`;
 }
