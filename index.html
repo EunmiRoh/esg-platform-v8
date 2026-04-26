@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.2</title>
+<title>ESG 자가진단 컨설팅 통합 플랫폼 v8.2.3</title>
 <meta property="og:title" content="ESG 자가진단 컨설팅 플랫폼">
 <meta property="og:description" content="중소기업 ESG 자가진단 + AI 맞춤형 컨설팅 보고서">
 <meta property="og:type" content="website">
@@ -12,8 +12,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<!-- v8.2: 진짜 docx XML 생성 (표 셀병합 완벽 지원) — 메인 라이브러리 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.js"></script>
+<!-- v8.2.3: docx-js CDN 폴백 체인 (cdnjs는 호스팅 불안정으로 제외 → unpkg → jsdelivr) -->
+<script
+  src="https://unpkg.com/docx@8.5.0/build/index.umd.js"
+  onerror="this.onerror=null; var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js'; s.onerror=function(){console.error('[v8.2.3] docx-js: 모든 CDN 폴백 실패');}; document.head.appendChild(s);"
+></script>
 <!-- v8.2: 폴백용 (docx-js 로딩 실패 시 사용) -->
 <script src="https://unpkg.com/html-docx-js/dist/html-docx.js"
         onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js';"></script>
@@ -316,7 +319,7 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
       <div class="brand-mark">ESG-AACS</div>
       <div class="brand-title">자가진단 컨설팅 플랫폼</div>
     </div>
-    <span class="brand-version">v8.2.2</span>
+    <span class="brand-version">v8.2.3</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
     <button class="btn-icon" id="helpBtn" onclick="openHelpGuide()" title="사용 안내" aria-label="사용 안내" style="font-size:18px;font-weight:700;color:var(--accent);">?</button>
@@ -587,16 +590,28 @@ body{font-family:var(--font);background:var(--off);color:var(--g1);line-height:1
 
 /* ═══ v8.2: 라이브러리 로드 상태 진단 (모바일 디버깅용) ═══ */
 window.addEventListener('load', () => {
+  // v8.2.3: docx-js 로딩 검증 강화 (Document/Paragraph/Table 모두 function 체크)
+  const docxLoaded = (
+    typeof window.docx !== 'undefined' &&
+    typeof window.docx.Document === 'function' &&
+    typeof window.docx.Paragraph === 'function' &&
+    typeof window.docx.Table === 'function'
+  );
+  if (docxLoaded) {
+    console.log('[v8.2.3] ✅ docx-js 정상 로드 (진짜 워드 경로 활성)');
+  } else {
+    console.warn('[v8.2.3] ⚠️ docx-js 미로드 — html-docx-js 폴백 사용');
+  }
   const libStatus = {
-    'docx-js (진짜 워드)':  typeof window.docx !== 'undefined' && !!window.docx.Document,
+    'docx-js (진짜 워드)':  docxLoaded,
     'html-docx-js (폴백)': typeof window.htmlDocx !== 'undefined',
     'jsPDF':              typeof window.jspdf !== 'undefined',
     'html2canvas':        typeof window.html2canvas !== 'undefined',
     'Supabase':           typeof window.supabase !== 'undefined'
   };
-  console.log('[v8.2.2] 라이브러리 로드 상태:', libStatus);
+  console.log('[v8.2.3] 라이브러리 로드 상태:', libStatus);
   const failed = Object.entries(libStatus).filter(([k,v]) => !v).map(([k]) => k);
-  if (failed.length) console.warn('[v8.2.2] 로드 실패 라이브러리:', failed);
+  if (failed.length) console.warn('[v8.2.3] 로드 실패 라이브러리:', failed);
 });
 
 /* ═══ Supabase 연결 ═══ */
@@ -1133,8 +1148,6 @@ ${weakDetail}
 - "권고합니다"로 끝내지 말고, "법규 근거: …" 또는 "본 분석 결과: …" 형식으로 근거 표기
 - 추측·일반론 금지. 출처가 명확하지 않으면 그 권고는 빼고 다른 권고로 대체
 
-# ${co.name} ESG 맞춤 컨설팅 보고서
-
 ## 1. 종합 진단
 
 (2~3문단으로 작성)
@@ -1331,7 +1344,7 @@ async function htmlToPdf(htmlString, filename){
 
   let cursorY = margin;       // 현재 페이지에서 다음 콘텐츠가 들어갈 Y
   let isFirstPage = true;
-  const minTailRoom = 25;     // v8.2.1: 페이지 하단에 25mm 미만이면 다음 페이지로 (한 줄 잘림 방지)
+  const minTailRoom = 35;     // v8.2.3: 페이지 하단에 35mm 미만이면 다음 페이지로 (이전 25mm → 35mm, 잘림 방지 강화)
 
   for (const sec of sections) {
     // 각 섹션 캡처
@@ -1412,8 +1425,14 @@ async function htmlToPdf(htmlString, filename){
  * @returns {Promise<Blob>}   - docx 파일 Blob
  */
 async function markdownToDocx(markdown, meta){
-  // docx-js UMD: window.docx 네임스페이스로 로드됨
-  if (!window.docx) throw new Error('docx-js 라이브러리가 로드되지 않았습니다');
+  // v8.2.3: 진짜 docx 경로 진입 전 최종 검증 (Document/Paragraph/Table 모두 function이어야 진행)
+  if (
+    typeof window.docx === 'undefined' ||
+    typeof window.docx.Document !== 'function'
+  ) {
+    console.warn('[v8.2.3] markdownToDocx: docx-js 미로드 — html-docx 폴백으로 우회');
+    throw new Error('docx-js 라이브러리가 로드되지 않았습니다');
+  }
 
   const {
     Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
@@ -1664,25 +1683,61 @@ async function markdownToDocx(markdown, meta){
 }
 
 /**
- * v8.2.2: html-docx-js 폴백 진입 직전, 모든 <table>의 본문 행 컬럼 수를
- * 헤더 컬럼 수에 맞춰 부족분만큼 빈 <td>를 자동 추가. AI가 4컬럼 표에서
- * 마지막 빈 셀을 누락한 경우(승인 표 일자 컬럼 등)를 안전하게 보정.
+ * v8.2.3: thead 제외 + 정확한 td 카운팅 + 빈 행 제거 + colspan 인지
+ * - thead 영역은 절대 건드리지 않음
+ * - 빈 행(td 0개)은 자동 제거
+ * - colspan 합계로 effective count 계산하여 과잉 보정 방지
+ * - 부족할 때만 채움
  */
 function normalizeTableRows(html) {
   return html.replace(/<table[^>]*>[\s\S]*?<\/table>/g, (tableHtml) => {
-    const headMatch = tableHtml.match(/<thead>[\s\S]*?<\/thead>/);
-    const headColCount = headMatch ? (headMatch[0].match(/<th/g) || []).length : 0;
-    if (!headColCount) return tableHtml;
-    return tableHtml.replace(/<tr>([\s\S]*?)<\/tr>/g, (rowHtml, inner) => {
-      const tdCount = (inner.match(/<td/g) || []).length;
-      if (tdCount > 0 && tdCount < headColCount) {
-        const lastTdMatch = inner.match(/<td[^>]*>[\s\S]*?<\/td>(?![\s\S]*<td)/);
-        const tdStyle = lastTdMatch ? lastTdMatch[0].match(/<td([^>]*)>/)[1] : '';
-        const fillTd = `<td${tdStyle}>-</td>`.repeat(headColCount - tdCount);
-        return rowHtml.replace('</tr>', fillTd + '</tr>');
+    // 1. 헤더 컬럼 수 산출 (thead의 th 개수, 없으면 첫 tr의 td 개수)
+    const headMatch = tableHtml.match(/<thead[^>]*>[\s\S]*?<\/thead>/);
+    let headColCount = 0;
+    if (headMatch) {
+      headColCount = (headMatch[0].match(/<th\b/g) || []).length;
+    } else {
+      const firstRow = tableHtml.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/);
+      if (firstRow) {
+        headColCount = (firstRow[0].match(/<td\b/g) || []).length
+          || (firstRow[0].match(/<th\b/g) || []).length;
       }
-      return rowHtml;
-    });
+    }
+    if (!headColCount) return tableHtml;
+
+    // 2. tbody 영역만 보정 (thead는 손대지 않음)
+    let bodyRegion = tableHtml;
+    let bodyStart = 0;
+    let bodyEnd = tableHtml.length;
+    const tbodyMatch = tableHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/);
+    if (tbodyMatch) {
+      bodyRegion = tbodyMatch[1];
+      bodyStart = tableHtml.indexOf(tbodyMatch[0]) + tbodyMatch[0].indexOf(tbodyMatch[1]);
+      bodyEnd = bodyStart + tbodyMatch[1].length;
+    } else if (headMatch) {
+      bodyStart = tableHtml.indexOf(headMatch[0]) + headMatch[0].length;
+      bodyEnd = tableHtml.lastIndexOf('</table>');
+      bodyRegion = tableHtml.slice(bodyStart, bodyEnd);
+    }
+
+    // 3. tbody 안의 tr 보정
+    const newBody = bodyRegion.replace(
+      /<tr\b[^>]*>([\s\S]*?)<\/tr>/g,
+      (rowHtml, inner) => {
+        const tdCount = (inner.match(/<td\b/g) || []).length;
+        if (tdCount === 0) return '';
+        const colspans = [...inner.matchAll(/<td[^>]*\bcolspan\s*=\s*["']?(\d+)/gi)];
+        const effectiveCount = tdCount + colspans.reduce((sum, m) => sum + (parseInt(m[1]) - 1), 0);
+        if (effectiveCount >= headColCount) return rowHtml;
+        const lastTdMatch = inner.match(/<td([^>]*)>[^<]*<\/td>\s*$/);
+        const tdAttrs = lastTdMatch ? lastTdMatch[1] : '';
+        const fillCount = headColCount - effectiveCount;
+        const fillTd = `<td${tdAttrs}>-</td>`.repeat(fillCount);
+        return rowHtml.replace(/<\/tr>\s*$/, fillTd + '</tr>');
+      }
+    );
+
+    return tableHtml.slice(0, bodyStart) + newBody + tableHtml.slice(bodyEnd);
   });
 }
 
@@ -1818,12 +1873,12 @@ async function generateAllPdfs(){
   const did = state.diagnosisId || ('temp-' + Date.now());
 
   // 1. 자가진단 보고서 PDF
-  const selfHtml = renderSelfAssessmentReportHtml();
+  const selfHtml = injectShapInfoBox(renderSelfAssessmentReportHtml());
   state.pdfs.self = await htmlToPdf(selfHtml, `${state.company.name}_자가진단_보고서.pdf`);
   state.uploads.self = await uploadPdfToStorage(state.pdfs.self, `${did}/self-assessment.pdf`);
 
   // 2. 컨설팅 보고서 PDF
-  const consHtml = renderConsultingReportHtml();
+  const consHtml = injectShapInfoBox(renderConsultingReportHtml());
   state.pdfs.consulting = await htmlToPdf(consHtml, `${state.company.name}_컨설팅_보고서.pdf`);
   state.uploads.consulting = await uploadPdfToStorage(state.pdfs.consulting, `${did}/consulting.pdf`);
 
@@ -2078,7 +2133,7 @@ function renderSelfAssessmentReportHtml(){
 
     <div class="pdf-section" style="margin-top:24px;padding-top:12px;border-top:1px solid #DDE2EE;font-size:10px;color:#8890A8;text-align:center;">
       본 보고서는 자가진단 응답을 기반으로 자동 생성되었습니다 · 작성일: ${today}<br>
-      © ESG-AACS Platform v8.2.2 · SHAP 기반 우선순위 (Heuristic Mode)
+      © ESG-AACS Platform v8.2.3 · SHAP 기반 우선순위 (Heuristic Mode)
     </div>
   </div>`;
 }
@@ -2210,7 +2265,7 @@ function renderConsultingReportHtml(){
       본 보고서는 Agentic AI (Claude Sonnet 4 + RAG + Knowledge Graph)로 자동 생성된 초안입니다.<br>
       ${state.userType === 'consultant' ? '<b style="color:#C0392B;">⚠ 컨설턴트 활용 시 전문가 검토 후 사용 권장</b><br>' : ''}
       출처: K-ESG 가이드라인 v2.0 · 중소기업 ESG 자가진단 실증 분석 · 중소기업중앙회 ESG 규정례<br>
-      © ESG-AACS Platform v8.2.2 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.3 · 작성일: ${today}
     </div>
   </div>`;
 }
@@ -2236,9 +2291,25 @@ function renderEvidenceHtml(doc){
     ${body}
     <div class="footer">
       본 문서는 Agentic AI가 작성한 <b>초안</b>입니다. 실제 사용 시 사실 확인 및 수정이 필요합니다.<br>
-      © ESG-AACS Platform v8.2.2 · 작성일: ${today}
+      © ESG-AACS Platform v8.2.3 · 작성일: ${today}
     </div>
   </div>`;
+}
+
+/* ═══ v8.2.3: SHAP 용어 설명 박스를 첫 등장 위치 직전에 1회 삽입 ═══ */
+function injectShapInfoBox(html) {
+  const shapInfoBox = `<div style="background:#fef9e7;border-left:4px solid #f1c40f;padding:10px 14px;margin:12px 0;border-radius:4px;font-size:11px;line-height:1.6;color:#5d4e00;"><strong>📌 SHAP 기여도란?</strong><br>박사학위 연구(GBM + XGBoost TreeSHAP, n=299 중소기업 데이터)에서 머신러닝 모델이 ESG 등급을 예측할 때 각 진단 문항을 얼마나 중요하게 본 비율입니다. 높을수록 해당 문항 개선 시 등급 상승 효과가 큽니다.</div>`;
+  const shapIndex = html.search(/SHAP/i);
+  if (shapIndex === -1) return html;
+  const blockStartRegex = /<(p|h2|h3|h4|li|td|div)[^>]*>/g;
+  let lastBlockStart = -1;
+  let match;
+  while ((match = blockStartRegex.exec(html)) !== null) {
+    if (match.index > shapIndex) break;
+    lastBlockStart = match.index;
+  }
+  if (lastBlockStart === -1) return shapInfoBox + html;
+  return html.slice(0, lastBlockStart) + shapInfoBox + html.slice(lastBlockStart);
 }
 
 function mdToHtml(md){
@@ -2250,7 +2321,7 @@ function mdToHtml(md){
     if (lines.length < 2) return m;
     const headers = lines[0].split('|').filter(c => c.trim());
     const dataRows = lines.slice(2);
-    let table = '<table style="width:100%;border-collapse:collapse;margin:14px 0;font-size:11.5px;border:1px solid #DDE2EE;">';
+    let table = '<table style="width:100%;border-collapse:collapse;margin:14px 0;font-size:11.5px;border:1px solid #DDE2EE;page-break-inside:avoid;page-break-before:auto;">';
     table += '<thead><tr style="background:#F4F7FB;">';
     headers.forEach(hd => { table += `<th style="padding:8px 12px;border:1px solid #DDE2EE;text-align:left;font-size:11px;color:#4A5270;font-weight:700;">${escapeHtml(hd.trim())}</th>`; });
     table += '</tr></thead><tbody>';
@@ -2264,8 +2335,8 @@ function mdToHtml(md){
     return table;
   });
   // 헤딩
-  h = h.replace(/^### (.*)$/gm, '<h3 style="font-size:14px;color:#002555;font-weight:800;margin:18px 0 8px 0;">$1</h3>');
-  h = h.replace(/^## (.*)$/gm, '<h2 style="font-size:17px;color:#002555;font-weight:900;margin:24px 0 10px 0;border-bottom:2px solid #3F8CAA;padding-bottom:5px;">$1</h2>');
+  h = h.replace(/^### (.*)$/gm, '<h3 style="font-size:14px;color:#002555;font-weight:800;margin:18px 0 8px 0;page-break-inside:avoid;orphans:3;widows:3;">$1</h3>');
+  h = h.replace(/^## (.*)$/gm, '<h2 style="font-size:17px;color:#002555;font-weight:900;margin:24px 0 10px 0;border-bottom:2px solid #3F8CAA;padding-bottom:5px;page-break-inside:avoid;page-break-after:avoid;orphans:3;widows:3;">$1</h2>');
   h = h.replace(/^# (.*)$/gm, '<h1 style="font-size:20px;color:#002555;font-weight:900;margin:24px 0 12px 0;">$1</h1>');
   // 굵은
   h = h.replace(/\*\*(.+?)\*\*/g, '<b style="color:#002555;">$1</b>');
@@ -2333,8 +2404,8 @@ function renderResult(){
   }).join('');
 
   // 보고서 영역에 HTML 표시 (PDF와 동일한 레이아웃을 화면에 노출)
-  $('#reportSelf').innerHTML = renderSelfAssessmentReportHtml();
-  $('#reportConsulting').innerHTML = renderConsultingReportHtml();
+  $('#reportSelf').innerHTML = injectShapInfoBox(renderSelfAssessmentReportHtml());
+  $('#reportConsulting').innerHTML = injectShapInfoBox(renderConsultingReportHtml());
 
   // 증빙자료 (v8.2: SHAP 우선순위 뱃지 + 안내 문구)
   let evHtml;
@@ -2440,7 +2511,7 @@ function renderDownloads(){
           : `<span class="dl-card-status ${item.blob ? 'ready' : 'failed'}">${item.blob ? '준비됨' : '생성 실패'}</span>`}
       </div>
       ${item.multi
-        ? `<button class="btn primary sm" onclick="downloadAllEvidence()" ${state.evidenceDocs.length === 0 ? 'disabled' : ''}>모두 다운로드</button>`
+        ? `<button class="btn primary sm" onclick="downloadAllEvidenceAsZip()" ${state.evidenceDocs.length === 0 ? 'disabled' : ''}>모두 다운로드</button>`
         : `<button class="btn primary sm" onclick="downloadPdf('${item.key}')" ${item.blob ? '' : 'disabled'}>다운로드</button>`}
     </div>
   `).join('');
