@@ -1110,8 +1110,21 @@ async function generateConsultingReport(){
     ).join('\n');
   }).filter(Boolean).join('\n\n');
 
+  // 전문가 검증 피드백 반영 (HITL 수정·재생성 단계): stage5_learning 최신 적용 디렉티브를 프롬프트에 주입
+  let feedbackBlock = '';
+  try {
+    if (sb) {
+      const { data, error } = await sb.from('stage5_learning')
+        .select('tuning_directive,priority_dimension,status')
+        .eq('status', 'applied').order('created_at', { ascending: false }).limit(1);
+      if (!error && data && data.length) {
+        feedbackBlock = `\n\n[전문가 검증 피드백 반영 지시 — HITL 수정·재생성 단계]\n${data[0].tuning_directive}\n(우선 개선 차원: ${data[0].priority_dimension}. 위 전문가 검증 피드백을 본 컨설팅 생성 전반에 우선 반영하라.)`;
+      }
+    }
+  } catch(_){}
+
   const prompt = `당신은 ${co.industry} 분야 중소기업 ESG 전문 컨설턴트입니다.
-"${co.name}" (${co.industry}, ${co.size})에 대한 ESG 컨설팅 보고서 본문을 작성하세요. 본문은 반드시 "## 1. 종합 진단"부터 시작하고, 보고서 제목 라인(# 제목)은 절대 포함하지 마세요. 또한 본문 어디에서도 보고서 자체의 제목이나 부제(예: '맞춤형 ESG 컨설팅 보고서', '종합 보고서' 등)를 절대 다시 언급하지 마세요. 본문은 분석 내용으로만 구성합니다.
+"${co.name}" (${co.industry}, ${co.size})에 대한 ESG 컨설팅 보고서 본문을 작성하세요. 본문은 반드시 "## 1. 종합 진단"부터 시작하고, 보고서 제목 라인(# 제목)은 절대 포함하지 마세요. 또한 본문 어디에서도 보고서 자체의 제목이나 부제(예: '맞춤형 ESG 컨설팅 보고서', '종합 보고서' 등)를 절대 다시 언급하지 마세요. 본문은 분석 내용으로만 구성합니다.${feedbackBlock}
 
 [기업 정보]
 - 기업명: ${co.name} | 산업: ${co.industry} | 규모: ${co.size}
