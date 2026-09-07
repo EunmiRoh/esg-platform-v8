@@ -22,11 +22,14 @@ const DIM_GUIDE = {
   '구체성': '개선과제를 정량 지표와 구체적 실행 절차 중심으로 서술한다.',
   '구조성': '보고서 구조와 가독성을 높이고 핵심 지표를 요약·시각화한다.',
 };
-function ruleBasedBody(top, commentList) {
+function ruleBasedBody(top, commentList, meetingPoints) {
   let body = `전문가 평가에서 '${top.label}' 차원이 가장 취약(평균 ${top.mean}, 불일치 ${top.sd})하게 나타났다. ` +
     (DIM_GUIDE[top.label] || `'${top.label}' 개선에 우선 초점을 둔다.`);
-  const top3 = (commentList || []).slice(0, 3).map(function (c) { return c.length > 120 ? c.slice(0, 120) + '…' : c; });
-  if (top3.length) body += ' 전문가 지적: ' + top3.map(function (c) { return '"' + c + '"'; }).join(' / ') + '.';
+  const clip = function (c) { return c.length > 120 ? c.slice(0, 120) + '…' : c; };
+  const top3 = (commentList || []).slice(0, 3).map(clip);
+  if (top3.length) body += ' 개인 설문 지적: ' + top3.map(function (c) { return '"' + c + '"'; }).join(' / ') + '.';
+  const mtg3 = (meetingPoints || []).slice(0, 3).map(clip);
+  if (mtg3.length) body += ' 다수 전문가 협의 합의: ' + mtg3.map(function (c) { return '"' + c + '"'; }).join(' / ') + '.';
   return body;
 }
 
@@ -111,7 +114,7 @@ ${meetingPoints.length ? meetingPoints.map(function (p) { return '- ' + p; }).jo
         }
       } catch (_) { /* 폴백으로 진행 */ }
     }
-    if (!body) { body = ruleBasedBody(top, commentList.concat(meetingPoints)); method = 'rule'; }
+    if (!body) { body = ruleBasedBody(top, commentList, meetingPoints); method = 'rule'; }
     const directive = `[우선 차원: ${top.label}] ${body}`;
 
     // 4. stage5_learning 저장 (service role insert, status=applied)
