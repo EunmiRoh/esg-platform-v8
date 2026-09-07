@@ -55,6 +55,16 @@ export default async function handler(req, res) {
     const n = rows.length;
     if (n < 1) return res.status(400).json({ error: '유효 전문가 응답이 없습니다.' });
 
+    // 1-b. 다수 전문가 협의 HITL(회의) 합의 의견 수집 → 학습에 함께 반영
+    let meetingPoints = [];
+    try {
+      const mr = await fetch(`${SUPABASE_URL}/rest/v1/meeting_feedback?status=eq.active&select=points&order=created_at.desc`, { headers: sbHeaders });
+      if (mr.ok) {
+        const mrows = await mr.json();
+        mrows.forEach(function (m) { if (Array.isArray(m.points)) meetingPoints = meetingPoints.concat(m.points.filter(Boolean)); });
+      }
+    } catch (_) { /* 회의 피드백 없으면 개인 설문만으로 진행 */ }
+
     // 2. 차원별 평균/불일치(SD) + 우선 차원 산출
     const stat = DIMS.map(([label, col]) => {
       const vals = rows.map(x => x[col]).filter(v => v != null).map(Number);
@@ -76,11 +86,14 @@ ${dimsText}
 
 [우선 개선 차원] ${top.label} (평균 ${top.mean}, 불일치 ${top.sd})
 
-[전문가 자유서술 피드백]
+[전문가 자유서술 피드백(개인 설문)]
 ${comments || '(자유서술 없음)'}
 
+[전문가 협의 피드백(회의 합의 의견)]
+${meetingPoints.length ? meetingPoints.map(function (p) { return '- ' + p; }).join('\n') : '(없음)'}
+
 위 피드백을 종합하여, ESG 컨설팅 보고서를 생성하는 LLM Agent의 시스템 프롬프트에 삽입할 '튜닝 디렉티브'를 작성하라.
-규칙: (1) 우선 차원 '${top.label}' 개선에 초점을 둘 것, (2) 전문가 자유서술에서 드러난 구체적 지적을 반영할 것, (3) 실행 가능한 지시문 형태로 3~5개 문장, (4) 한국어, (5) 250자 내외, (6) 서두·메타설명·머리말 없이 지시문 본문만 출력.`;
+규칙: (1) 우선 차원 '${top.label}' 개선에 초점을 둘 것, (2) 개인 설문 자유서술과 회의 협의 의견에서 드러난 구체적 지적을 함께 반영할 것, (3) 실행 가능한 지시문 형태로 3~5개 문장, (4) 한국어, (5) 300자 내외, (6) 서두·메타설명·머리말 없이 지시문 본문만 출력.`;
 
     // LLM 우선 시도, 실패(크레딧 부족·키 부재 등) 시 규칙 기반 폴백
     let body = '';
@@ -98,7 +111,7 @@ ${comments || '(자유서술 없음)'}
         }
       } catch (_) { /* 폴백으로 진행 */ }
     }
-    if (!body) { body = ruleBasedBody(top, commentList); method = 'rule'; }
+    if (!body) { body = ruleBasedBody(top, commentList.concat(meetingPoints)); method = 'rule'; }
     const directive = `[우선 차원: ${top.label}] ${body}`;
 
     // 4. stage5_learning 저장 (service role insert, status=applied)
@@ -118,7 +131,7 @@ ${comments || '(자유서술 없음)'}
     if (!ins.ok) return res.status(502).json({ error: 'stage5_learning 저장 실패: ' + (await ins.text()) });
     const created = await ins.json();
 
-    return res.status(200).json({ ok: true, n_experts: n, priority: top.label, method, record: created[0] });
+    return res.status(200).json({ ok: true, n_experts: n, n_meeting_points: meetingPoints.length, priority: top.label, method, record: created[0] });
   } catch (e) {
     return res.status(500).json({ error: String(e && e.message || e) });
   }
