@@ -1042,6 +1042,7 @@ async function runAnalysis(){
     // Stage 3: 컨설팅 보고서 (AI)
     state.consultingReport = await generateConsultingReport();
     setAnalyzingStage('consulting', 'done');
+    requestAutoJudge();   // Stage 4 자동 판정 (비동기 — 결과를 기다리지 않음)
 
     // Stage 3-E: 증빙자료 (AI)
     setAnalyzingStage('evidence', 'active');
@@ -1258,6 +1259,25 @@ ${weakDetail}
     console.error('컨설팅 보고서 생성 실패:', e);
     return '## 보고서 생성 실패\n\n시스템 오류로 보고서를 생성할 수 없었습니다.\n다시 시도해주세요.\n\n오류: ' + e.message;
   }
+}
+
+/* ═══ Stage 4 자동 판정 ═══
+   보고서를 EIEC 5차원 자동 채점 + 법규·인증 인용 검증 → 기준 미달이면 어드민 HITL 큐에 검수 대기로 등록.
+   사용자 흐름을 막지 않도록 응답을 기다리지 않는다(keepalive로 페이지 이동 후에도 전송). */
+function requestAutoJudge(){
+  const text = state.consultingReport || '';
+  if (!state.diagnosisId || text.length < 200 || text.startsWith('## 보고서 생성 실패')) return;
+  const body = JSON.stringify({
+    diagnosis_id: state.diagnosisId,
+    report_text: text.slice(0, 30000),
+    industry: state.company.industry,
+    size: state.company.size,
+    grade: state.result && state.result.grade
+  });
+  fetch('/api/auto-judge', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body,
+    keepalive: new Blob([body]).size < 60000   // keepalive 본문 한도 64KB(바이트)
+  }).catch(e => console.warn('자동 판정 요청 실패:', e));
 }
 
 /* ═══ AI 증빙자료 생성 ═══ */
