@@ -22,7 +22,7 @@ const DIM_GUIDE = {
   '구체성': '개선과제를 정량 지표와 구체적 실행 절차 중심으로 서술한다.',
   '구조성': '보고서 구조와 가독성을 높이고 핵심 지표를 요약·시각화한다.',
 };
-function ruleBasedBody(top, commentList, meetingPoints) {
+function ruleBasedBody(top, commentList, meetingPoints, hitlPoints) {
   let body = `전문가 평가에서 '${top.label}' 차원이 가장 취약(평균 ${top.mean}, 불일치 ${top.sd})하게 나타났다. ` +
     (DIM_GUIDE[top.label] || `'${top.label}' 개선에 우선 초점을 둔다.`);
   const clip = function (c) { return c.length > 120 ? c.slice(0, 120) + '…' : c; };
@@ -30,6 +30,8 @@ function ruleBasedBody(top, commentList, meetingPoints) {
   if (top3.length) body += ' 개인 설문 지적: ' + top3.map(function (c) { return '"' + c + '"'; }).join(' / ') + '.';
   const mtg3 = (meetingPoints || []).slice(0, 3).map(clip);
   if (mtg3.length) body += ' 다수 전문가 협의 합의: ' + mtg3.map(function (c) { return '"' + c + '"'; }).join(' / ') + '.';
+  const hitl3 = (hitlPoints || []).slice(0, 3).map(clip);
+  if (hitl3.length) body += ' 산출물 검수 지적: ' + hitl3.map(function (c) { return '"' + c + '"'; }).join(' / ') + '.';
   return body;
 }
 
@@ -68,6 +70,20 @@ export default async function handler(req, res) {
       }
     } catch (_) { /* 회의 피드백 없으면 개인 설문만으로 진행 */ }
 
+    // 1-c. 산출물 HITL 검수(수정 요청·반려) 의견 수집 → 학습에 함께 반영
+    let hitlPoints = [];
+    const hitlDimCount = {};
+    try {
+      const hr = await fetch(`${SUPABASE_URL}/rest/v1/hitl_reviews?status=in.(revision,rejected)&select=flagged_dims,comment&order=decided_at.desc`, { headers: sbHeaders });
+      if (hr.ok) {
+        (await hr.json()).forEach(function (h) {
+          (h.flagged_dims || []).forEach(function (d) { hitlDimCount[d] = (hitlDimCount[d] || 0) + 1; });
+          const tag = (h.flagged_dims || []).length ? '[' + h.flagged_dims.join('·') + '] ' : '';
+          if (h.comment || tag) hitlPoints.push(tag + (h.comment || ''));
+        });
+      }
+    } catch (_) { /* 검수 이력 없으면 설문·회의만으로 진행 */ }
+
     // 2. 차원별 평균/불일치(SD) + 우선 차원 산출
     const stat = DIMS.map(([label, col]) => {
       const vals = rows.map(x => x[col]).filter(v => v != null).map(Number);
@@ -95,8 +111,11 @@ ${comments || '(자유서술 없음)'}
 [전문가 협의 피드백(회의 합의 의견)]
 ${meetingPoints.length ? meetingPoints.map(function (p) { return '- ' + p; }).join('\n') : '(없음)'}
 
+[산출물 HITL 검수 지적(수정 요청·반려)]
+${hitlPoints.length ? hitlPoints.map(function (p) { return '- ' + p; }).join('\n') : '(없음)'}
+
 위 피드백을 종합하여, ESG 컨설팅 보고서를 생성하는 LLM Agent의 시스템 프롬프트에 삽입할 '튜닝 디렉티브'를 작성하라.
-규칙: (1) 우선 차원 '${top.label}' 개선에 초점을 둘 것, (2) 개인 설문 자유서술과 회의 협의 의견에서 드러난 구체적 지적을 함께 반영할 것, (3) 실행 가능한 지시문 형태로 3~5개 문장, (4) 한국어, (5) 300자 내외, (6) 서두·메타설명·머리말 없이 지시문 본문만 출력.`;
+규칙: (1) 우선 차원 '${top.label}' 개선에 초점을 둘 것, (2) 개인 설문 자유서술, 회의 협의 의견, 산출물 검수 지적에서 드러난 구체적 지적을 함께 반영할 것, (3) 실행 가능한 지시문 형태로 3~5개 문장, (4) 한국어, (5) 300자 내외, (6) 서두·메타설명·머리말 없이 지시문 본문만 출력.`;
 
     // LLM 우선 시도, 실패(크레딧 부족·키 부재 등) 시 규칙 기반 폴백
     let body = '';
@@ -114,7 +133,7 @@ ${meetingPoints.length ? meetingPoints.map(function (p) { return '- ' + p; }).jo
         }
       } catch (_) { /* 폴백으로 진행 */ }
     }
-    if (!body) { body = ruleBasedBody(top, commentList, meetingPoints); method = 'rule'; }
+    if (!body) { body = ruleBasedBody(top, commentList, meetingPoints, hitlPoints); method = 'rule'; }
     const directive = `[우선 차원: ${top.label}] ${body}`;
 
     // 4. stage5_learning 저장 (service role insert, status=applied)
@@ -134,7 +153,7 @@ ${meetingPoints.length ? meetingPoints.map(function (p) { return '- ' + p; }).jo
     if (!ins.ok) return res.status(502).json({ error: 'stage5_learning 저장 실패: ' + (await ins.text()) });
     const created = await ins.json();
 
-    return res.status(200).json({ ok: true, n_experts: n, n_meeting_points: meetingPoints.length, priority: top.label, method, record: created[0] });
+    return res.status(200).json({ ok: true, n_experts: n, n_meeting_points: meetingPoints.length, n_hitl_points: hitlPoints.length, hitl_dim_count: hitlDimCount, priority: top.label, method, record: created[0] });
   } catch (e) {
     return res.status(500).json({ error: String(e && e.message || e) });
   }
